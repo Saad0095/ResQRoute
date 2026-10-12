@@ -1,0 +1,6 @@
+# from to distance_km
+Central Hospital 4
+Central Station 2
+Station Hospital 3
+Station School 5
+School Hospital 2
