@@ -37,12 +37,10 @@ public:
 
     void display() const
     {
-        cout << "ID: " << id
-             << " | Driver: " << driverName
-             << " | Location: " << location
-             << " | Status: "
-             << (isAvailable ? "Available" : "Busy")
-             << '\n';
+        cout << "ID: " << id << "\n";
+        cout << "Driver: " << driverName << "\n";
+        cout << "Location: " << location << "\n";
+        cout << "Status: " << (isAvailable ? "Available" : "Busy") << '\n';
     }
 };
 
@@ -65,11 +63,10 @@ public:
 
     void display() const
     {
-        cout << "ID: " << id
-             << " | Name: " << name
-             << " | Location: " << location
-             << " | Available Beds: " << capacity
-             << '\n';
+        cout << "ID: " << id << "\n";
+        cout << "Name: " << name << "\n";
+        cout << "Location: " << location << "\n";
+        cout << "Capacity Of Patients: " << capacity << "\n";
     }
 };
 
@@ -131,10 +128,12 @@ public:
 
 struct EmergencyPriority
 {
-    bool operator()(const Emergency &e1, const Emergency &e2) const{
+    bool operator()(const Emergency &e1, const Emergency &e2) const
+    {
         // False means a has high priotiy than b, and vice versa
-        if(e1.getSeverity() == e2.getSeverity()) return e1.getId() > e2.getId();
-        
+        if (e1.getSeverity() == e2.getSeverity())
+            return e1.getId() > e2.getId();
+
         // True means b has high priotiy than a, and vice versa
         return e1.getSeverity() < e2.getSeverity();
     }
@@ -199,7 +198,7 @@ public:
                 // displayEmergencies();
                 break;
             case 0:
-                cout << "Exiting ResQRoute...\n";
+                cout << "Exiting ResQRoute... Thanks for Using!\n";
                 break;
             default:
                 cout << "Invalid choice. Please try again.\n";
