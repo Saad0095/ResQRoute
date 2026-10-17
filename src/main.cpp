@@ -1,4 +1,8 @@
-#include <bits/stdc++.h>
+#include <iostream>
+#include <vector>
+#include <string>
+#include <algorithm>
+#include <queue>
 using namespace std;
 
 class Ambulance
@@ -18,13 +22,16 @@ public:
         isAvailable = av;
     }
 
-    int getId() const{
+    int getId() const
+    {
         return id;
     }
-    bool getAvailibility() const{
+    bool getAvailibility() const
+    {
         return isAvailable;
     }
-    void updateAvailibility(){
+    void updateAvailibility()
+    {
         isAvailable = !isAvailable;
     }
 
@@ -70,17 +77,66 @@ class Emergency
 {
 private:
     int id;
-    string driverName;
-    string area;
-    bool isAvailable;
+    string patientName;
+    string location;
+    int severity;
 
 public:
-    Emergency(int i = 101, string d = "Unkown", string ar = "Karachi", bool av = false)
+    Emergency(int i = 000, string patient = "Unknown", string loc = "Karachi", int s = 1)
     {
         id = i;
-        driverName = d;
-        area = ar;
-        isAvailable = av;
+        patientName = patient;
+        location = loc;
+        severity = s;
+    }
+
+    int getId() const
+    {
+        return id;
+    }
+
+    int getSeverity() const
+    {
+        return severity;
+    }
+
+    void display()
+    {
+        string condition;
+
+        switch (severity)
+        {
+        case 1:
+            condition = "Low";
+            break;
+        case 2:
+            condition = "Medium";
+            break;
+        case 3:
+            condition = "High";
+            break;
+        case 4:
+            condition = "Critical";
+            break;
+
+        default:
+            break;
+        }
+        cout << "ID: " << id << "\n";
+        cout << "Patient Name: " << patientName << "\n";
+        cout << "Location: " << location << "\n";
+        cout << "Condition: " << condition << "\n";
+    }
+};
+
+struct EmergencyPriority
+{
+    bool operator()(const Emergency &e1, const Emergency &e2) const{
+        // False means a has high priotiy than b, and vice versa
+        if(e1.getSeverity() == e2.getSeverity()) return e1.getId() > e2.getId();
+        
+        // True means b has high priotiy than a, and vice versa
+        return e1.getSeverity() < e2.getSeverity();
     }
 };
 
@@ -89,7 +145,7 @@ class ResQRoute
 private:
     vector<Ambulance> ambulances;
     vector<Hospital> hospitals;
-    vector<Emergency> emergencies;
+    priority_queue<Emergency, vector<Emergency>, EmergencyPriority> emergencies;
 
 public:
     ResQRoute()
