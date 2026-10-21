@@ -3,6 +3,7 @@
 #include <string>
 #include <algorithm>
 #include <queue>
+#include <limits>
 using namespace std;
 
 class Ambulance
@@ -37,6 +38,7 @@ public:
 
     void display() const
     {
+        cout << "\n";
         cout << "ID: " << id << "\n";
         cout << "Driver: " << driverName << "\n";
         cout << "Location: " << location << "\n";
@@ -63,6 +65,7 @@ public:
 
     void display() const
     {
+        cout << "\n";
         cout << "ID: " << id << "\n";
         cout << "Name: " << name << "\n";
         cout << "Location: " << location << "\n";
@@ -119,6 +122,8 @@ public:
         default:
             break;
         }
+        
+        cout << "\n";
         cout << "ID: " << id << "\n";
         cout << "Patient Name: " << patientName << "\n";
         cout << "Location: " << location << "\n";
@@ -157,12 +162,108 @@ public:
         hospitals.push_back(Hospital(202, "Central Hospital", "Nazimabad", 5));
     }
 
+    void displayAmbulances() const
+    {
+        cout << "\n--- Ambulance List ---\n";
+
+        if (ambulances.empty())
+        {
+            cout << "No ambulances registered.\n";
+            return;
+        }
+
+        for (const Ambulance &ambulance : ambulances)
+        {
+            ambulance.display();
+        }
+    }
+    void addAmbulance()
+    {
+        int id;
+        cout << "Enter ambulance ID: ";
+        cin >> id;
+
+        if (id <= 0)
+        {
+            cout << "ID must be positive.\n";
+            return;
+        }
+
+        auto it = find_if(
+            ambulances.begin(),
+            ambulances.end(),
+            [id](const Ambulance &ambulance)
+            {
+                return ambulance.getId() == id;
+            });
+
+        if (it != ambulances.end())
+        {
+            cout << "Ambulance ID already exists.\n";
+            return;
+        }
+
+        string driver;
+        cout << "Enter driver name: ";
+        cin >> driver;
+        string location;
+        cout << "Enter current location: ";
+        cin >> location;
+
+        ambulances.push_back(Ambulance(id, driver, location));
+
+        cout << "Ambulance added successfully.\n";
+    }
+
+    void updateAmbulanceStatus()
+    {
+        int id;
+        cout << "Enter ambulance ID: ";
+        cin >> id;
+
+        auto it = find_if(
+            ambulances.begin(),
+            ambulances.end(),
+            [id](const Ambulance &ambulance)
+            {
+                return ambulance.getId() == id;
+            });
+
+        if (it == ambulances.end())
+        {
+            cout << "Ambulance not found.\n";
+            return;
+        }
+
+        it->updateAvailibility();
+
+        cout << "Ambulance status updated.\n";
+        it->display();
+    }
+
+    void displayHospitals() const
+    {
+        cout << "\n--- Hospital List ---\n";
+
+        if (hospitals.empty())
+        {
+            cout << "No hospitals registered.\n";
+            return;
+        }
+
+        for (const Hospital &hospital : hospitals)
+        {
+            hospital.display();
+        }
+    }
+
     int choice;
     void run()
     {
         cout << "** Welcome to ResQRoute **\n";
         do
         {
+            cout << "\n";
             cout << "1. Display Ambulances\n";
             cout << "2. Add Ambulance\n";
             cout << "3. Update Ambulance Status\n";
@@ -177,16 +278,16 @@ public:
             switch (choice)
             {
             case 1:
-                // displayAmbulances();
+                displayAmbulances();
                 break;
             case 2:
-                // addAmbulance();
+                addAmbulance();
                 break;
             case 3:
-                // updateAmbulanceStatus();
+                updateAmbulanceStatus();
                 break;
             case 4:
-                // displayHospitals();
+                displayHospitals();
                 break;
             case 5:
                 // addHospital();
