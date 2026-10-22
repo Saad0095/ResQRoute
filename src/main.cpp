@@ -135,7 +135,7 @@ public:
         default:
             break;
         }
-        
+
         cout << "\n";
         cout << "ID: " << id << "\n";
         cout << "Patient Name: " << patientName << "\n";
@@ -404,6 +404,42 @@ public:
         }
     }
 
+    void processNextEmergency()
+    {
+        if (emergencies.empty())
+        {
+            cout << "No pending emergencies to process.\n";
+            return;
+        }
+
+        auto amb = find_if(
+            ambulances.begin(),
+            ambulances.end(),
+            [](const Ambulance &ambulance)
+            {
+                return ambulance.getAvailibility();
+            });
+
+        if (amb == ambulances.end())
+        {
+            cout << "No available ambulances. Emergency remains pending.\n";
+            return;
+        }
+
+        Emergency emergency = emergencies.top();
+
+        cout << "\n--- Processing Emergency ---\n";
+        emergency.display();
+
+        cout << "\n--- Assigned Ambulance ---\n";
+        amb->display();
+
+        amb->updateAvailibility();
+        emergencies.pop();
+
+        cout << "Emergency processed successfully.\n";
+    }
+
     int choice;
     void run()
     {
@@ -419,6 +455,7 @@ public:
             cout << "5. Add Hospital\n";
             cout << "6. Register Emergency\n";
             cout << "7. Display Sorted Emergencies\n";
+            cout << "8. Process Next Emergency\n";
             cout << "0. Exit\n";
             cout << "Enter your choice: ";
             if (!readInteger(choice))
@@ -452,6 +489,9 @@ public:
             case 7:
                 displayEmergencies();
                 break;
+            case 8:
+                processNextEmergency();
+                break;
             case 0:
                 cout << "Exiting ResQRoute... Thanks for Using!\n";
                 break;
@@ -469,4 +509,3 @@ int main()
     app.run();
     return 0;
 }
-
