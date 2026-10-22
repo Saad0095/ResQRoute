@@ -6,19 +6,6 @@
 #include <limits>
 using namespace std;
 
-bool readInteger(int &value)
-{
-    if (cin >> value)
-        return true;
-
-    if (!cin.eof())
-    {
-        cin.clear();
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    }
-    return false;
-}
-
 class Ambulance
 {
 private:
@@ -194,12 +181,7 @@ public:
     {
         int id;
         cout << "Enter ambulance ID: ";
-        if (!readInteger(id))
-        {
-            if (!cin.eof())
-                cout << "Invalid ambulance ID.\n";
-            return;
-        }
+        cin >> id;
 
         if (id <= 0)
         {
@@ -239,12 +221,7 @@ public:
     {
         int id;
         cout << "Enter ambulance ID: ";
-        if (!readInteger(id))
-        {
-            if (!cin.eof())
-                cout << "Invalid ambulance ID.\n";
-            return;
-        }
+        cin >> id;
 
         auto it = find_if(
             ambulances.begin(),
@@ -286,12 +263,7 @@ public:
     {
         int id;
         cout << "Enter hospital ID: ";
-        if (!readInteger(id))
-        {
-            if (!cin.eof())
-                cout << "Invalid hospital ID.\n";
-            return;
-        }
+        cin >> id;
 
         if (id <= 0)
         {
@@ -311,12 +283,7 @@ public:
 
         int capacity;
         cout << "Enter hospital capacity: ";
-        if (!readInteger(capacity))
-        {
-            if (!cin.eof())
-                cout << "Invalid hospital capacity.\n";
-            return;
-        }
+        cin >> capacity;
 
         if (capacity <= 0)
         {
@@ -332,12 +299,7 @@ public:
     {
         int id;
         cout << "Enter emergency ID: ";
-        if (!readInteger(id))
-        {
-            if (!cin.eof())
-                cout << "Invalid emergency ID.\n";
-            return;
-        }
+        cin >> id;
 
         if (id <= 0)
         {
@@ -368,12 +330,7 @@ public:
 
         int severity;
         cout << "Enter severity (1-Low, 2-Medium, 3-High, 4-Critical): ";
-        if (!readInteger(severity))
-        {
-            if (!cin.eof())
-                cout << "Invalid severity.\n";
-            return;
-        }
+        cin >> severity;
 
         if (severity < 1 || severity > 4)
         {
@@ -458,13 +415,7 @@ public:
             cout << "8. Process Next Emergency\n";
             cout << "0. Exit\n";
             cout << "Enter your choice: ";
-            if (!readInteger(choice))
-            {
-                if (cin.eof())
-                    break;
-                cout << "Invalid choice. Please try again.\n";
-                continue;
-            }
+            cin >> choice;
 
             switch (choice)
             {
