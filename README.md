@@ -6,17 +6,15 @@
 > should it take, and which hospital should receive the emergency?**
 
 ResQRoute is a university **Data Structures and Algorithms project in C++**
-that explores these decisions through a simulated city. The project models
-roads as a weighted graph, then gradually builds an intelligent dispatch
-workflow around it.
+that explores these decisions through a simulated city and a menu-driven
+emergency dispatch workflow.
 
-![Status](https://img.shields.io/badge/status-initial%20setup-blue)
+![Status](https://img.shields.io/badge/status-working%20console%20application-blue)
 ![Language](https://img.shields.io/badge/language-C%2B%2B17-00599C)
 ![Focus](https://img.shields.io/badge/focus-Data%20Structures%20%26%20Algorithms-orange)
 
-> **Current milestone:** The starter application loads a sample city and
-> reports its intersections and roads. The complete dispatch simulation is
-> intentionally being developed step by step.
+> **Current milestone:** The console application manages ambulances, hospitals,
+> and emergency requests using C++ STL containers.
 
 ---
 
@@ -56,37 +54,34 @@ integration.
 
 ## 🌟 Project goals
 
-ResQRoute will demonstrate how the right data structure or algorithm can make
-each dispatch decision more organized and efficient:
+ResQRoute demonstrates how the right data structure or algorithm can make each
+dispatch decision more organized and efficient:
 
-1. Represent a simulated city as a weighted graph.
-2. Prioritize emergencies according to urgency.
-3. Find an available and suitable ambulance.
-4. Calculate an efficient route to the incident and hospital.
-5. React to simulated road closures.
-6. Compare the design choices and time complexity of the implemented DSA
-   techniques.
+1. Store and display ambulance records.
+2. Store and display hospital records.
+3. Register emergency requests with severity levels.
+4. Prioritize emergencies using a priority queue.
+5. Assign an available ambulance to the highest-priority pending emergency.
+6. Update ambulance availability after processing an emergency.
 
 ## 🧠 DSA toolkit
 
 | DSA concept | Role in ResQRoute |
 | --- | --- |
-| **Graph + adjacency list** | Represents intersections and weighted roads |
-| **Dijkstra's algorithm** | Finds shortest paths without a heuristic |
-| **A\* algorithm** | Explores an advanced route-finding approach |
 | **Priority queue / heap** | Processes urgent requests and candidate ambulances |
-| **Hash map** | Provides fast lookup by emergency, ambulance, and hospital ID |
-| **Sorting** | Ranks suitable ambulances and hospitals |
+| **Vector** | Stores ambulances and hospitals |
+| **Linear search** | Finds ambulances by ID and available ambulances |
+| **STL algorithms** | Uses `find_if` for record lookup |
 
 These concepts are included only where they naturally fit the problem. The
 project is focused on the agreed DSA scope rather than adding unrelated
 features or frameworks.
 
-## 🗺️ Planned dispatch flow
+## 🗺️ Current dispatch flow
 
 ```text
 ┌──────────────────────┐
-│ Load simulated data  │
+│ Load sample records  │
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
@@ -94,15 +89,16 @@ features or frameworks.
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
-│ Rank ambulances      │ ◄── availability and suitability
+│ Find an available    │
+│ ambulance            │
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
-│ Calculate route      │ ◄── Dijkstra or A*
+│ Assign the ambulance │
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
-│ Rank hospitals       │ ◄── distance and suitability
+│ Remove the emergency │
 └──────────┬───────────┘
            ▼
 ┌──────────────────────┐
@@ -112,11 +108,10 @@ features or frameworks.
 
 ## 🚧 Development roadmap
 
-- [x] Create modular C++ project structure
-- [x] Load a small simulated road network
-- [x] Store road data in a graph-oriented structure
-- [ ] Add emergency, ambulance, and hospital entities
-- [ ] Add priority-based emergency processing
+- [x] Create a modular C++ project structure
+- [x] Add emergency, ambulance, and hospital entities
+- [x] Add priority-based emergency processing
+- [x] Add ambulance availability updates
 - [ ] Implement Dijkstra's shortest-path routing
 - [ ] Implement A\* route finding
 - [ ] Add hash-map-based entity lookup
@@ -124,37 +119,21 @@ features or frameworks.
 - [ ] Simulate road closures and rerouting
 - [ ] Display complete dispatch decisions and complexity notes
 
-## 🧪 Current starter demo
+## 🧪 Current application
 
-The current program reads [`data/sample_city.txt`](data/sample_city.txt),
-which contains five one-way sample roads:
+The application is a menu-driven console program. It starts with sample
+ambulances and hospitals and provides options to:
 
-```text
-# from to distance_km
-Central Hospital 4
-Central Station 2
-Station Hospital 3
-Station School 5
-School Hospital 2
-```
-
-Running the starter produces:
-
-```text
-ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch
-Loaded 4 intersections and 5 roads.
-Starter graph ready for dispatch features.
-```
-
-This small demo confirms that the project can read simulated city data and
-build its initial graph representation. Routing and dispatch logic will be
-added in later milestones.
+- Display, add, and update ambulances.
+- Display and add hospitals.
+- Register emergencies with low, medium, high, or critical severity.
+- Display pending emergencies in priority order.
+- Process the highest-priority emergency when an ambulance is available.
 
 ## 🛠️ Technology
 
 - **C++17**
 - **C++ Standard Library (STL)**
-- **CMake 3.15+**
 - **GCC / MSYS2 MinGW-w64**
 - **VS Code** (optional)
 
@@ -164,61 +143,39 @@ No external libraries are required.
 
 ```text
 ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch/
-├── CMakeLists.txt             # CMake build configuration
 ├── README.md                  # Project documentation
-├── data/
-│   └── sample_city.txt        # Simulated road data
-├── include/
-│   └── resqroute/
-│       └── graph.hpp          # RoadGraph interface
 └── src/
-    ├── graph.cpp              # RoadGraph implementation
-    └── main.cpp               # Starter application
+    ├── Ambulance.h/.cpp       # Ambulance class
+    ├── Hospital.h/.cpp        # Hospital class
+    ├── Emergency.h/.cpp       # Emergency class and priority comparator
+    ├── ResQRoute.h/.cpp       # Application controller and menu operations
+    └── main.cpp               # Program entry point
 ```
 
 ## 🚀 Setup and execution
 
 ### Prerequisites
 
-Install a C++17-capable GCC toolchain and CMake. On Windows, **MSYS2
-MinGW-w64** is suitable. Confirm that `g++` and `cmake` are available in the
-VS Code terminal.
+Install a C++17-capable GCC toolchain. On Windows, **MSYS2 MinGW-w64** is
+suitable. Confirm that `g++` is available in the VS Code terminal.
 
-### Option A: CMake
-
-Run these commands from the ResQRoute project directory:
+### Direct GCC compilation
 
 ```powershell
-cmake -S . -B build -G "MinGW Makefiles"
-cmake --build build
-.\build\resqroute.exe
+cd "E:\University\3rd Semester\DSA\Final-Project\ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch\src"
+g++ main.cpp ResQRoute.cpp Emergency.cpp Hospital.cpp Ambulance.cpp -o ResQRoute.exe
+.\ResQRoute.exe
 ```
 
-If the MinGW Makefiles generator is not available, use the generator
-configured for the installed compiler:
-
-```powershell
-cmake -S . -B build
-cmake --build build
-.\build\resqroute.exe
-```
-
-### Option B: Direct GCC compilation
-
-```powershell
-g++ -std=c++17 -Wall -Wextra -pedantic -Iinclude src/main.cpp src/graph.cpp -o resqroute.exe
-.\resqroute.exe
-```
-
-The executable expects `data/sample_city.txt` relative to the project
-directory, so run it from that directory.
+Compile all five `.cpp` files because the class implementations are split
+across separate modules. Run the commands again after making source changes.
 
 ## 📌 Current limitations
 
-- The starter currently loads and summarizes only the road graph.
-- Emergency dispatch, ambulance selection, hospital ranking, Dijkstra, A\*,
-  road closures, and complete input validation are not implemented yet.
-- Distances and locations are simulated.
+- Route calculation, road closures, and hospital suitability ranking are not
+  implemented yet.
+- Input assumes that numeric values are entered where requested.
+- Distances and locations are not used for route calculation yet.
 - The application has no live GPS, real-time traffic, external maps,
   databases, APIs, authentication, or cloud deployment.
 - This is an educational console application, not a production emergency
