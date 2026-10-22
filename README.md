@@ -159,7 +159,10 @@ ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch/
 Install a C++17-capable GCC toolchain. On Windows, **MSYS2 MinGW-w64** is
 suitable. Confirm that `g++` is available in the VS Code terminal.
 
-### Direct GCC compilation
+### How to run the program
+
+Open PowerShell or the VS Code terminal and run these commands from the
+project's `src` directory:
 
 ```powershell
 cd "E:\University\3rd Semester\DSA\Final-Project\ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch\src"
@@ -169,6 +172,17 @@ g++ main.cpp ResQRoute.cpp Emergency.cpp Hospital.cpp Ambulance.cpp -o ResQRoute
 
 Compile all five `.cpp` files because the class implementations are split
 across separate modules. Run the commands again after making source changes.
+The program then displays a menu. Enter a menu number and press **Enter**.
+Choose `0` to exit.
+
+To compile and run the program with one command:
+
+```powershell
+cd "E:\University\3rd Semester\DSA\Final-Project\ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch\src"; g++ main.cpp ResQRoute.cpp Emergency.cpp Hospital.cpp Ambulance.cpp -o ResQRoute.exe; if ($?) { .\ResQRoute.exe }
+```
+
+If the executable is already running, close it before compiling again so that
+the compiler can replace `ResQRoute.exe`.
 
 ## 📌 Current limitations
 
