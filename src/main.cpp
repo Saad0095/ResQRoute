@@ -6,6 +6,19 @@
 #include <limits>
 using namespace std;
 
+bool readInteger(int &value)
+{
+    if (cin >> value)
+        return true;
+
+    if (!cin.eof())
+    {
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    }
+    return false;
+}
+
 class Ambulance
 {
 private:
@@ -181,7 +194,12 @@ public:
     {
         int id;
         cout << "Enter ambulance ID: ";
-        cin >> id;
+        if (!readInteger(id))
+        {
+            if (!cin.eof())
+                cout << "Invalid ambulance ID.\n";
+            return;
+        }
 
         if (id <= 0)
         {
@@ -203,12 +221,14 @@ public:
             return;
         }
 
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
         string driver;
         cout << "Enter driver name: ";
-        cin >> driver;
+        getline(cin, driver);
         string location;
         cout << "Enter current location: ";
-        cin >> location;
+        getline(cin, location);
 
         ambulances.push_back(Ambulance(id, driver, location));
 
@@ -219,7 +239,12 @@ public:
     {
         int id;
         cout << "Enter ambulance ID: ";
-        cin >> id;
+        if (!readInteger(id))
+        {
+            if (!cin.eof())
+                cout << "Invalid ambulance ID.\n";
+            return;
+        }
 
         auto it = find_if(
             ambulances.begin(),
@@ -257,10 +282,133 @@ public:
         }
     }
 
+    void addHospital()
+    {
+        int id;
+        cout << "Enter hospital ID: ";
+        if (!readInteger(id))
+        {
+            if (!cin.eof())
+                cout << "Invalid hospital ID.\n";
+            return;
+        }
+
+        if (id <= 0)
+        {
+            cout << "ID must be positive.\n";
+            return;
+        }
+
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        string name;
+        cout << "Enter hospital name: ";
+        getline(cin, name);
+
+        string location;
+        cout << "Enter hospital location: ";
+        getline(cin, location);
+
+        int capacity;
+        cout << "Enter hospital capacity: ";
+        if (!readInteger(capacity))
+        {
+            if (!cin.eof())
+                cout << "Invalid hospital capacity.\n";
+            return;
+        }
+
+        if (capacity <= 0)
+        {
+            cout << "Capacity must be positive.\n";
+            return;
+        }
+
+        hospitals.push_back(Hospital(id, name, location, capacity));
+        cout << "Hospital added successfully.\n";
+    }
+
+    void registerEmergency()
+    {
+        int id;
+        cout << "Enter emergency ID: ";
+        if (!readInteger(id))
+        {
+            if (!cin.eof())
+                cout << "Invalid emergency ID.\n";
+            return;
+        }
+
+        if (id <= 0)
+        {
+            cout << "ID must be positive.\n";
+            return;
+        }
+
+        auto temp = emergencies;
+        while (!temp.empty())
+        {
+            if (temp.top().getId() == id)
+            {
+                cout << "Emergency ID already exists.\n";
+                return;
+            }
+            temp.pop();
+        }
+
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
+        string patientName;
+        cout << "Enter patient name: ";
+        getline(cin, patientName);
+
+        string location;
+        cout << "Enter emergency location: ";
+        getline(cin, location);
+
+        int severity;
+        cout << "Enter severity (1-Low, 2-Medium, 3-High, 4-Critical): ";
+        if (!readInteger(severity))
+        {
+            if (!cin.eof())
+                cout << "Invalid severity.\n";
+            return;
+        }
+
+        if (severity < 1 || severity > 4)
+        {
+            cout << "Severity must be between 1 and 4.\n";
+            return;
+        }
+
+        emergencies.push(Emergency(id, patientName, location, severity));
+        cout << "Emergency registered successfully.\n";
+    }
+
+    void displayEmergencies()
+    {
+        cout << "\n--- Emergencies Sorted By Priority ---\n";
+
+        if (emergencies.empty())
+        {
+            cout << "No emergencies registered.\n";
+            return;
+        }
+
+        auto sortedEmergencies = emergencies;
+        while (!sortedEmergencies.empty())
+        {
+            Emergency emergency = sortedEmergencies.top();
+            emergency.display();
+            sortedEmergencies.pop();
+        }
+    }
+
     int choice;
     void run()
     {
         cout << "** Welcome to ResQRoute **\n";
+        choice = -1;
         do
         {
             cout << "\n";
@@ -273,7 +421,13 @@ public:
             cout << "7. Display Sorted Emergencies\n";
             cout << "0. Exit\n";
             cout << "Enter your choice: ";
-            cin >> choice;
+            if (!readInteger(choice))
+            {
+                if (cin.eof())
+                    break;
+                cout << "Invalid choice. Please try again.\n";
+                continue;
+            }
 
             switch (choice)
             {
@@ -290,13 +444,13 @@ public:
                 displayHospitals();
                 break;
             case 5:
-                // addHospital();
+                addHospital();
                 break;
             case 6:
-                // registerEmergency();
+                registerEmergency();
                 break;
             case 7:
-                // displayEmergencies();
+                displayEmergencies();
                 break;
             case 0:
                 cout << "Exiting ResQRoute... Thanks for Using!\n";
@@ -315,3 +469,4 @@ int main()
     app.run();
     return 0;
 }
+
