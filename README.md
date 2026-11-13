@@ -110,59 +110,72 @@ features or frameworks.
 
 - [x] Create a modular C++ project structure
 - [x] Add emergency, ambulance, and hospital entities
-- [x] Add priority-based emergency processing
+- [x] Add priority-based emergency processing (Max-Heap triage)
 - [x] Add ambulance availability updates
-- [ ] Implement Dijkstra's shortest-path routing
-- [ ] Implement A\* route finding
-- [ ] Add hash-map-based entity lookup
-- [ ] Add candidate ranking and sorting
-- [ ] Simulate road closures and rerouting
-- [ ] Display complete dispatch decisions and complexity notes
-
-## 🧪 Current application
-
-The application is a menu-driven console program. It starts with sample
-ambulances and hospitals and provides options to:
-
-- Display, add, and update ambulances.
-- Display and add hospitals.
-- Register emergencies with low, medium, high, or critical severity.
-- Display pending emergencies in priority order.
-- Process the highest-priority emergency when an ambulance is available.
-
-## 🛠️ Technology
-
-- **C++17**
-- **C++ Standard Library (STL)**
-- **GCC / MSYS2 MinGW-w64**
-- **VS Code** (optional)
-
-No external libraries are required.
+- [x] Implement Dijkstra's shortest-path routing (`backend/dsa/graph.py`)
+- [x] Build REST API dispatch backend (`backend/server.py`)
+- [x] Build One-Tap SOS Mobile App with live HUD (`mobile/App.js`)
+- [ ] Add dynamic road closures and detour rerouting
+- [ ] Add map tile view in mobile app
 
 ## 📁 Project structure
 
 ```text
 ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch/
-├── README.md                  # Project documentation
-└── src/
-    ├── Ambulance.h/.cpp       # Ambulance class
-    ├── Hospital.h/.cpp        # Hospital class
-    ├── Emergency.h/.cpp       # Emergency class and priority comparator
-    ├── ResQRoute.h/.cpp       # Application controller and menu operations
-    └── main.cpp               # Program entry point
+├── backend/                       # Python DSA Engine & REST API
+│   ├── dsa/
+│   │   ├── graph.py               # City Graph (Adjacency List) & Dijkstra's Algorithm
+│   │   └── priority_queue.py      # Emergency Triage Max-Heap
+│   ├── models.py                  # Ambulance, Hospital, Emergency schemas
+│   ├── server.py                  # FastAPI Dispatch Server
+│   ├── run_server.py              # Server launcher
+│   ├── test_api.py                # Automated DSA & API test suite
+│   └── requirements.txt
+├── mobile/                        # One-Tap SOS Mobile Application (React Native / Expo)
+│   ├── App.js                     # High-impact SOS screen & Live Dispatch HUD
+│   ├── package.json
+│   ├── app.json
+│   └── src/
+│       ├── api.js                 # API bridge to DSA Backend
+│       └── theme.js               # Emergency high-contrast dark theme
+├── src/                           # Original C++ Console System
+│   ├── Ambulance.h/.cpp
+│   ├── Hospital.h/.cpp
+│   ├── Emergency.h/.cpp
+│   ├── ResQRoute.h/.cpp
+│   └── main.cpp
+└── README.md
 ```
 
 ## 🚀 Setup and execution
 
-### Prerequisites
+### 1. Running the DSA Backend API
+The backend runs the **Priority Queue Triage** and **Dijkstra Shortest Path** calculations.
 
-Install a C++17-capable GCC toolchain. On Windows, **MSYS2 MinGW-w64** is
-suitable. Confirm that `g++` is available in the VS Code terminal.
+```powershell
+# In the project root:
+python backend/run_server.py
+```
+- API Endpoint: `http://localhost:8000`
+- Interactive API Docs & Swagger UI: `http://localhost:8000/docs`
 
-### How to run the program
+To run the automated DSA & dispatch test suite:
+```powershell
+python backend/test_api.py
+```
 
-Open PowerShell or the VS Code terminal and run these commands from the
-project's `src` directory:
+### 2. Running the One-Tap Mobile App (Expo)
+The mobile app provides a clean one-click SOS button for instant emergency dispatch.
+
+```powershell
+cd mobile
+npx expo start
+```
+- Press `w` in terminal to view directly in your web browser.
+- Or scan the QR code with the free **Expo Go** app on your iPhone or Android device!
+
+### 3. Running the Original C++ Console Application
+To compile and run the console version:
 
 ```powershell
 cd "E:\University\3rd Semester\DSA\Final-Project\ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch\src"
