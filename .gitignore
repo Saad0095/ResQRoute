@@ -1,9 +1,53 @@
-/build/
+# Build directories (anywhere)
+build/
+dist/
+out/
+
+# C++ compiled files (anywhere)
 *.exe
 *.out
 *.o
 *.obj
-.vscode
+*.dll
+*.so
+*.a
+*.lib
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Expo / React Native
+node_modules/
+.expo/
+.expo-shared/
+web-build/
+android/.gradle/
+ios/Pods/
+*.jks
+*.keystore
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Editors
+.vscode/
+.idea/
+
+# Temporary / test files
 test*.cpp
 tempCodeRunnerFile.cpp
+
+# OS files
+.DS_Store
+Thumbs.db

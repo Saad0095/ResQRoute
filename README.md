@@ -169,8 +169,9 @@ The mobile app provides a clean one-click SOS button for instant emergency dispa
 
 ```powershell
 cd mobile
-npx expo start
+npm start
 ```
+*(Alternatively, you can run `node start.js`)*
 - Press `w` in terminal to view directly in your web browser.
 - Or scan the QR code with the free **Expo Go** app on your iPhone or Android device!
 

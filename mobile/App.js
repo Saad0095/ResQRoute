@@ -11,7 +11,9 @@ import {
   ScrollView,
   Modal,
   Alert,
+  Platform,
 } from "react-native";
+import { registerRootComponent } from "expo";
 import { triggerSOS, fetchLocations, resetSimulation } from "./src/api";
 import { theme } from "./src/theme";
 
@@ -84,6 +86,14 @@ export default function App() {
     return () => clearInterval(timer);
   }, [dispatchResult, remainingEta]);
 
+  const showAlert = (title, msg) => {
+    if (typeof window !== "undefined" && window.alert) {
+      window.alert(`${title}: ${msg}`);
+    } else {
+      Alert.alert(title, msg);
+    }
+  };
+
   const handleSOSPress = async () => {
     setLoading(true);
     try {
@@ -98,19 +108,27 @@ export default function App() {
         setDispatchResult(response);
         setRemainingEta(response.ambulanceEtaMinutes || 4);
       } else {
-        Alert.alert(
+        showAlert(
           "Notice",
           response?.message || "Could not dispatch an ambulance. Queue is full."
         );
       }
     } catch (err) {
-      Alert.alert("Error", "Could not connect to emergency dispatch server.");
+      showAlert("Error", "Could not connect to emergency dispatch server.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleCancel = () => {
+    if (typeof window !== "undefined" && window.confirm) {
+      if (window.confirm("Are you sure you want to cancel the emergency dispatch?")) {
+        setDispatchResult(null);
+        resetSimulation();
+      }
+      return;
+    }
+
     Alert.alert(
       "Cancel Emergency?",
       "Are you sure you want to cancel the dispatch?",
@@ -421,6 +439,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.bgDark,
+    ...(Platform.OS === "web" ? { minHeight: "100vh", height: "100%", width: "100%" } : {}),
   },
   header: {
     alignItems: "center",
@@ -428,6 +447,9 @@ const styles = StyleSheet.create({
     paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#1E293B",
+    maxWidth: 520,
+    width: "100%",
+    alignSelf: "center",
   },
   headerBadge: {
     backgroundColor: theme.colors.primaryRed,
@@ -459,6 +481,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 24,
+    maxWidth: 520,
+    width: "100%",
+    alignSelf: "center",
   },
   locationBar: {
     flexDirection: "row",
@@ -604,6 +629,9 @@ const styles = StyleSheet.create({
   },
   hudContainer: {
     padding: 20,
+    maxWidth: 520,
+    width: "100%",
+    alignSelf: "center",
   },
   dispatchedBanner: {
     flexDirection: "row",
@@ -808,4 +836,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
+registerRootComponent(App);
 
