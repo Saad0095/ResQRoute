@@ -1,10 +1,10 @@
 """
 Graph Data Structure & Dijkstra's Shortest Path Algorithm
-for ResQRoute Emergency Dispatch.
+with Dynamic Road Closures & Rerouting for ResQRoute Emergency Dispatch.
 """
 
 import heapq
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Set
 
 
 class CityGraph:
@@ -12,11 +12,14 @@ class CityGraph:
     Weighted undirected graph representing city road networks.
     Vertices: City areas / zones / intersections.
     Edges: Roads with travel distance/time weights in kilometers/minutes.
+    Supports dynamic road closures and live rerouting.
     """
 
     def __init__(self):
         # Adjacency list: node -> list of (neighbor, weight)
         self.adj_list: Dict[str, List[Tuple[str, float]]] = {}
+        # Set of closed road tuples: (min(u,v), max(u,v))
+        self.closed_roads: Set[Tuple[str, str]] = set()
 
     def add_node(self, node: str) -> None:
         if node not in self.adj_list:
@@ -29,12 +32,49 @@ class CityGraph:
         self.adj_list[u].append((v, weight))
         self.adj_list[v].append((u, weight))
 
+    def _edge_key(self, u: str, v: str) -> Tuple[str, str]:
+        return (min(u, v), max(u, v))
+
+    def toggle_road(self, u: str, v: str) -> bool:
+        """
+        Toggles the road closure state.
+        Returns True if road is now CLOSED, False if OPEN.
+        """
+        key = self._edge_key(u, v)
+        if key in self.closed_roads:
+            self.closed_roads.remove(key)
+            return False
+        else:
+            self.closed_roads.add(key)
+            return True
+
+    def is_road_closed(self, u: str, v: str) -> bool:
+        return self._edge_key(u, v) in self.closed_roads
+
+    def get_roads(self) -> List[Dict]:
+        """Returns all road segments with closure status."""
+        roads = []
+        seen = set()
+        for u in self.adj_list:
+            for v, weight in self.adj_list[u]:
+                key = self._edge_key(u, v)
+                if key not in seen:
+                    seen.add(key)
+                    roads.append({
+                        "u": key[0],
+                        "v": key[1],
+                        "weight": weight,
+                        "isClosed": key in self.closed_roads
+                    })
+        return roads
+
     def get_nodes(self) -> List[str]:
         return list(self.adj_list.keys())
 
     def dijkstra(self, start_node: str) -> Tuple[Dict[str, float], Dict[str, Optional[str]]]:
         """
-        Dijkstra's Algorithm to find shortest paths from start_node to all other reachable nodes.
+        Dijkstra's Algorithm to find shortest paths from start_node to all reachable nodes,
+        dynamically skipping any roads that are currently marked closed.
         Complexity: O((V + E) log V) using a binary heap (priority queue).
         
         Returns:
@@ -59,6 +99,10 @@ class CityGraph:
                 continue
 
             for neighbor, weight in self.adj_list[current_node]:
+                # Skip closed roads (dynamic detour rerouting)
+                if self._edge_key(current_node, neighbor) in self.closed_roads:
+                    continue
+
                 new_dist = current_dist + weight
 
                 # Relaxation step
@@ -78,7 +122,6 @@ class CityGraph:
         if distances.get(end_node, float("inf")) == float("inf"):
             return [], float("inf")
 
-        # Reconstruct path using predecessors map
         path: List[str] = []
         curr: Optional[str] = end_node
         while curr is not None:
@@ -91,11 +134,10 @@ class CityGraph:
 
 def build_default_city_map() -> CityGraph:
     """
-    Creates the default road network of the simulated city (e.g. Karachi sectors).
+    Creates the default road network of the simulated city (Karachi sectors).
     """
     graph = CityGraph()
 
-    # Major arterial roads with distances (in km / estimated minutes)
     roads = [
         ("North Karachi", "Nazimabad", 6.5),
         ("Nazimabad", "Gulshan", 5.0),
@@ -114,4 +156,3 @@ def build_default_city_map() -> CityGraph:
         graph.add_road(u, v, w)
 
     return graph
-

@@ -126,15 +126,18 @@ ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch/
 │   ├── dsa/
 │   │   ├── graph.py               # City Graph (Adjacency List) & Dijkstra's Algorithm
 │   │   └── priority_queue.py      # Emergency Triage Max-Heap
+│   ├── static/
+│   │   └── dashboard.html         # Control Room Web Dashboard (Interactive City Map)
 │   ├── models.py                  # Ambulance, Hospital, Emergency schemas
 │   ├── server.py                  # FastAPI Dispatch Server
 │   ├── run_server.py              # Server launcher
 │   ├── test_api.py                # Automated DSA & API test suite
 │   └── requirements.txt
-├── mobile/                        # One-Tap SOS Mobile Application (React Native / Expo)
-│   ├── App.js                     # High-impact SOS screen & Live Dispatch HUD
+├── mobile/                        # Cross-Platform Mobile App (React Native / Expo)
+│   ├── App.js                     # Citizen SOS Screen & Ambulance Driver HUD
 │   ├── package.json
 │   ├── app.json
+│   ├── start.js                   # Node runner (bypasses Windows path bug)
 │   └── src/
 │       ├── api.js                 # API bridge to DSA Backend
 │       └── theme.js               # Emergency high-contrast dark theme
@@ -149,23 +152,27 @@ ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch/
 
 ## 🚀 Setup and execution
 
-### 1. Running the DSA Backend API
-The backend runs the **Priority Queue Triage** and **Dijkstra Shortest Path** calculations.
+### 1. Central Control Room Web Dashboard & Backend API
+The backend serves the live **Control Room Web Dashboard** with an interactive city map, real-time road closures, and Dijkstra shortest-path calculations.
 
 ```powershell
 # In the project root:
 python backend/run_server.py
 ```
-- API Endpoint: `http://localhost:8000`
-- Interactive API Docs & Swagger UI: `http://localhost:8000/docs`
+- **Control Room Web Dashboard:** Open `http://localhost:8000` (or `http://localhost:8000/dashboard`)
+  - 🗺️ **Interactive City Map:** Karachi sector graph with real-time ambulance & hospital markers.
+  - ⛔ **Dynamic Road Closures:** Click any road segment to block/unblock it and watch Dijkstra reroute!
+  - 📊 **Priority Queue Visualizer:** Live triage Max-Heap table.
+  - 🚑 **Fleet & Bed Monitors:** Real-time unit availability and hospital bed tracking.
+- **Interactive Swagger API Docs:** `http://localhost:8000/docs`
 
 To run the automated DSA & dispatch test suite:
 ```powershell
 python backend/test_api.py
 ```
 
-### 2. Running the One-Tap Mobile App (Expo)
-The mobile app provides a clean one-click SOS button for instant emergency dispatch.
+### 2. Multi-Role Mobile App (Expo)
+The mobile app provides both **Citizen One-Tap SOS** and **Ambulance Driver HUD** views.
 
 ```powershell
 cd mobile
@@ -174,6 +181,9 @@ npm start
 *(Alternatively, you can run `node start.js`)*
 - Press `w` in terminal to view directly in your web browser.
 - Or scan the QR code with the free **Expo Go** app on your iPhone or Android device!
+- Use the top toggle to switch between:
+  - 📱 **Citizen SOS:** One-tap emergency call with live ETA.
+  - 🚑 **Driver HUD:** Live navigation, patient sector, and mission completion buttons.
 
 ### 3. Running the Original C++ Console Application
 To compile and run the console version:

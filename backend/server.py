@@ -1,22 +1,30 @@
+import os
 import uuid
 import math
 from typing import List, Dict, Any, Optional
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 try:
     from dsa.graph import CityGraph, build_default_city_map
     from dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
-    from models import AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse
+    from models import (
+        AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse,
+        RoadToggleRequest, DriverStatusUpdate
+    )
 except ImportError:
     from backend.dsa.graph import CityGraph, build_default_city_map
     from backend.dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
-    from backend.models import AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse
+    from backend.models import (
+        AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse,
+        RoadToggleRequest, DriverStatusUpdate
+    )
 
 app = FastAPI(
     title="ResQRoute Intelligent Emergency Dispatch API",
     description="Backend DSA Engine combining Priority Queue Triage with Dijkstra's Shortest Path Routing.",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 # Enable CORS for Mobile App and Web clients
@@ -28,6 +36,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+
 # In-Memory State
 graph: CityGraph = build_default_city_map()
 triage_queue: EmergencyPriorityQueue = EmergencyPriorityQueue()
@@ -37,13 +47,14 @@ dispatch_history: List[Dict[str, Any]] = []
 
 
 def init_default_records():
-    global ambulances, hospitals, triage_queue, dispatch_history
+    global ambulances, hospitals, triage_queue, dispatch_history, graph
+    graph = build_default_city_map()
     ambulances = [
-        AmbulanceModel(id=101, driverName="Ali Khan", location="North Karachi", isAvailable=True, phone="+92 301 5550101"),
-        AmbulanceModel(id=102, driverName="Ahmed Raza", location="Gulshan", isAvailable=True, phone="+92 302 5550102"),
-        AmbulanceModel(id=103, driverName="Usman Sheikh", location="Nazimabad", isAvailable=True, phone="+92 303 5550103"),
-        AmbulanceModel(id=104, driverName="Tariq Jameel", location="Saddar", isAvailable=True, phone="+92 304 5550104"),
-        AmbulanceModel(id=105, driverName="Hamza Qureshi", location="Clifton", isAvailable=True, phone="+92 305 5550105"),
+        AmbulanceModel(id=101, driverName="Ali Khan", location="North Karachi", isAvailable=True, phone="+92 301 5550101", status="Available"),
+        AmbulanceModel(id=102, driverName="Ahmed Raza", location="Gulshan", isAvailable=True, phone="+92 302 5550102", status="Available"),
+        AmbulanceModel(id=103, driverName="Usman Sheikh", location="Nazimabad", isAvailable=True, phone="+92 303 5550103", status="Available"),
+        AmbulanceModel(id=104, driverName="Tariq Jameel", location="Saddar", isAvailable=True, phone="+92 304 5550104", status="Available"),
+        AmbulanceModel(id=105, driverName="Hamza Qureshi", location="Clifton", isAvailable=True, phone="+92 305 5550105", status="Available"),
     ]
     hospitals = [
         HospitalModel(id=201, name="City Hospital", location="Gulshan", totalBeds=15, availableBeds=12),
@@ -58,24 +69,41 @@ def init_default_records():
 init_default_records()
 
 
-@app.get("/")
-def root():
-    return {
-        "project": "ResQRoute Intelligent Dispatch System",
-        "status": "online",
-        "dsaEngines": ["Dijkstra Shortest Path", "Priority Queue Max-Heap Triage"],
-        "endpoints": {
-            "sos": "POST /api/emergency/sos",
-            "status": "GET /api/status",
-            "reset": "POST /api/reset",
-            "locations": "GET /api/locations"
-        }
-    }
+@app.get("/", response_class=HTMLResponse)
+def serve_dashboard():
+    """Serves the Control Room Web Dashboard directly."""
+    dash_path = os.path.join(STATIC_DIR, "dashboard.html")
+    if os.path.exists(dash_path):
+        return FileResponse(dash_path)
+    return HTMLResponse("<h1>ResQRoute API Online. Visit /docs for Swagger UI.</h1>")
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+def serve_dashboard_explicit():
+    return serve_dashboard()
 
 
 @app.get("/api/locations")
 def get_locations():
     return {"locations": graph.get_nodes()}
+
+
+@app.get("/api/roads")
+def get_roads():
+    return {"roads": graph.get_roads()}
+
+
+@app.post("/api/road/toggle")
+def toggle_road(req: RoadToggleRequest):
+    """Dynamically close or reopen a road segment to test rerouting."""
+    is_closed = graph.toggle_road(req.u, req.v)
+    return {
+        "success": True,
+        "u": req.u,
+        "v": req.v,
+        "isClosed": is_closed,
+        "message": f"Road {req.u} ⇄ {req.v} is now {'CLOSED (Blocked)' if is_closed else 'OPEN'}"
+    }
 
 
 @app.get("/api/status")
@@ -85,7 +113,8 @@ def get_system_status():
         "hospitals": [h.dict() for h in hospitals],
         "pendingEmergencies": triage_queue.to_list(),
         "recentDispatches": dispatch_history[-10:],
-        "availableZones": graph.get_nodes()
+        "availableZones": graph.get_nodes(),
+        "closedRoads": [list(k) for k in graph.closed_roads]
     }
 
 
@@ -102,7 +131,6 @@ def trigger_sos(request: SOSRequest):
     """
     patient_loc = request.location
     if patient_loc not in graph.get_nodes():
-        # Fallback to closest known node or first node if not exact match
         patient_loc = "Gulshan"
 
     emergency_id = f"EMG-{uuid.uuid4().hex[:6].upper()}"
@@ -120,7 +148,7 @@ def trigger_sos(request: SOSRequest):
     severity_labels = {1: "Low", 2: "Medium", 3: "High", 4: "Critical"}
     sev_label = severity_labels.get(current_call.severity, "Critical")
 
-    # 1. Dijkstra from patient location to evaluate all node distances
+    # 1. Dijkstra from patient location to evaluate all reachable node distances
     distances_from_patient, _ = graph.dijkstra(patient_loc)
 
     # 2. Find closest available ambulance using shortest path distances
@@ -136,12 +164,12 @@ def trigger_sos(request: SOSRequest):
                 best_ambulance = amb
                 best_amb_path = path
 
-    if not best_ambulance:
-        # Re-queue the emergency since no ambulance is free right now
+    if not best_ambulance or best_amb_dist == float("inf"):
+        # Re-queue the emergency since no ambulance is reachable/free right now
         triage_queue.push(current_call)
         return DispatchResponse(
             success=False,
-            message="All ambulances are currently busy! Emergency is queued in priority order.",
+            message="No available ambulance can reach this location (All units busy or roads blocked)! Queued.",
             emergencyId=emergency_id,
             severityLabel=sev_label,
             patientLocation=patient_loc
@@ -157,21 +185,35 @@ def trigger_sos(request: SOSRequest):
             dist_to_hosp = distances_from_patient[hosp.location]
             if dist_to_hosp < best_hosp_dist:
                 path, dist = graph.get_shortest_path(patient_loc, hosp.location)
-                best_hosp_dist = dist
-                best_hospital = hosp
-                best_hosp_path = path
+                if dist != float("inf"):
+                    best_hosp_dist = dist
+                    best_hospital = hosp
+                    best_hosp_path = path
 
     # 4. State updates
     best_ambulance.isAvailable = False
-
+    best_ambulance.status = "Dispatched"
+    
     if best_hospital:
         best_hospital.availableBeds = max(0, best_hospital.availableBeds - 1)
 
     # ETA calculations: assuming ~35-40 km/h average emergency speed (~1.5 min per km) + 2 min prep
     amb_eta = max(2, math.ceil(best_amb_dist * 1.5))
-    hosp_eta = max(3, math.ceil(best_hosp_dist * 1.5))
+    hosp_eta = max(3, math.ceil(best_hosp_dist * 1.5)) if best_hospital else 0
     total_dist = round(best_amb_dist + (best_hosp_dist if best_hosp_dist != float("inf") else 0.0), 1)
     total_eta = amb_eta + hosp_eta
+
+    mission_info = {
+        "emergencyId": emergency_id,
+        "patientName": request.patientName,
+        "patientLocation": patient_loc,
+        "severity": sev_label,
+        "hospitalName": best_hospital.name if best_hospital else "Nearest Clinic",
+        "hospitalLocation": best_hospital.location if best_hospital else patient_loc,
+        "route": best_amb_path + (best_hosp_path[1:] if best_hosp_path else []),
+        "eta": amb_eta,
+    }
+    best_ambulance.currentMission = mission_info
 
     result = DispatchResponse(
         success=True,
@@ -186,14 +228,46 @@ def trigger_sos(request: SOSRequest):
         assignedHospital=best_hospital,
         hospitalRoute=best_hosp_path,
         hospitalDistanceKm=round(best_hosp_dist, 1) if best_hospital else 0.0,
-        hospitalEtaMinutes=hosp_eta if best_hospital else 0,
+        hospitalEtaMinutes=hosp_eta,
         totalTripDistanceKm=total_dist,
         totalEtaMinutes=total_eta
     )
 
-    # Record in history
     dispatch_history.append(result.dict())
     return result
+
+
+@app.get("/api/ambulance/{amb_id}/mission")
+def get_ambulance_mission(amb_id: int):
+    for amb in ambulances:
+        if amb.id == amb_id:
+            return {
+                "ambulanceId": amb.id,
+                "driverName": amb.driverName,
+                "location": amb.location,
+                "isAvailable": amb.isAvailable,
+                "status": amb.status,
+                "currentMission": amb.currentMission
+            }
+    raise HTTPException(status_code=404, detail="Ambulance not found")
+
+
+@app.post("/api/ambulance/{amb_id}/status")
+def update_ambulance_status(amb_id: int, req: DriverStatusUpdate):
+    for amb in ambulances:
+        if amb.id == amb_id:
+            amb.status = req.status
+            if req.status in ["Completed", "Available"]:
+                amb.isAvailable = True
+                amb.status = "Available"
+                amb.currentMission = None
+            return {
+                "success": True,
+                "ambulanceId": amb.id,
+                "newStatus": amb.status,
+                "isAvailable": amb.isAvailable
+            }
+    raise HTTPException(status_code=404, detail="Ambulance not found")
 
 
 @app.post("/api/reset")

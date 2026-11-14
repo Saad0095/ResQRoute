@@ -14,10 +14,20 @@ import {
   Platform,
 } from "react-native";
 import { registerRootComponent } from "expo";
-import { triggerSOS, fetchLocations, resetSimulation } from "./src/api";
+import {
+  triggerSOS,
+  fetchLocations,
+  resetSimulation,
+  fetchAmbulanceMission,
+  updateAmbulanceStatus,
+} from "./src/api";
 import { theme } from "./src/theme";
 
 export default function App() {
+  // App Role: 'citizen' or 'driver'
+  const [appRole, setAppRole] = useState("citizen");
+
+  // Citizen State
   const [selectedLocation, setSelectedLocation] = useState("Gulshan");
   const [locations, setLocations] = useState([
     "Gulshan",
@@ -34,12 +44,17 @@ export default function App() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [remainingEta, setRemainingEta] = useState(0);
 
-  // Pulse animations for the giant SOS button
+  // Driver State
+  const [driverAmbId, setDriverAmbId] = useState(102); // Default: Ahmed Raza (Gulshan)
+  const [driverMission, setDriverMission] = useState(null);
+  const [driverStatus, setDriverStatus] = useState("Available");
+  const [updatingDriver, setUpdatingDriver] = useState(false);
+
+  // Concentric Pulse animations for the SOS button
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const ringAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Start pulsing concentric animation
     Animated.loop(
       Animated.parallel([
         Animated.sequence([
@@ -69,19 +84,35 @@ export default function App() {
       ])
     ).start();
 
-    // Fetch city zones from API
     fetchLocations().then((locs) => {
       if (locs && locs.length > 0) setLocations(locs);
     });
   }, []);
 
-  // Countdown timer for live ETA
+  // Poll driver mission when in driver mode
+  useEffect(() => {
+    let interval;
+    if (appRole === "driver") {
+      const checkMission = async () => {
+        const data = await fetchAmbulanceMission(driverAmbId);
+        if (data) {
+          setDriverStatus(data.status);
+          setDriverMission(data.currentMission);
+        }
+      };
+      checkMission();
+      interval = setInterval(checkMission, 2500);
+    }
+    return () => clearInterval(interval);
+  }, [appRole, driverAmbId]);
+
+  // Citizen Live ETA Countdown
   useEffect(() => {
     let timer;
     if (dispatchResult && remainingEta > 0) {
       timer = setInterval(() => {
         setRemainingEta((prev) => Math.max(0, prev - 1));
-      }, 60000); // Decrements each minute
+      }, 60000);
     }
     return () => clearInterval(timer);
   }, [dispatchResult, remainingEta]);
@@ -98,7 +129,7 @@ export default function App() {
     setLoading(true);
     try {
       const response = await triggerSOS({
-        patientName: "Emergency User",
+        patientName: "Emergency Caller",
         location: selectedLocation,
         severity: severity,
         notes: "One-click mobile SOS triggered",
@@ -146,6 +177,16 @@ export default function App() {
     );
   };
 
+  const handleDriverStatusChange = async (newStatus) => {
+    setUpdatingDriver(true);
+    await updateAmbulanceStatus(driverAmbId, newStatus);
+    setDriverStatus(newStatus);
+    if (newStatus === "Completed") {
+      setDriverMission(null);
+    }
+    setUpdatingDriver(false);
+  };
+
   const ringScale = ringAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.45],
@@ -160,206 +201,221 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor={theme.colors.bgDark} />
 
-      {/* HEADER */}
+      {/* HEADER WITH ROLE SWITCHER */}
       <View style={styles.header}>
         <View style={styles.headerBadge}>
-          <Text style={styles.headerBadgeText}>911 / 1122 EMERGENCY</Text>
+          <Text style={styles.headerBadgeText}>911 / 1122 RESQROUTE</Text>
         </View>
         <Text style={styles.title}>ResQRoute</Text>
-        <Text style={styles.subtitle}>INTELLIGENT EMERGENCY DISPATCH</Text>
-      </View>
-
-      {!dispatchResult ? (
-        /* IDLE SCREEN - HUGE SOS BUTTON */
-        <ScrollView
-          contentContainerStyle={styles.idleContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* LOCATION SELECTOR BAR */}
+        
+        {/* ROLE TOGGLE TABS */}
+        <View style={styles.roleToggleRow}>
           <TouchableOpacity
-            style={styles.locationBar}
-            onPress={() => setShowLocationModal(true)}
-            activeOpacity={0.8}
+            style={[
+              styles.roleTab,
+              appRole === "citizen" && styles.roleTabActive,
+            ]}
+            onPress={() => setAppRole("citizen")}
           >
-            <View style={styles.locationIconBg}>
-              <Text style={{ fontSize: 18 }}>📍</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.locationLabel}>CURRENT LOCATION</Text>
-              <Text style={styles.locationValue}>
-                {selectedLocation}, Karachi
-              </Text>
-            </View>
-            <Text style={styles.changeText}>Tap to change ▾</Text>
+            <Text
+              style={[
+                styles.roleTabText,
+                appRole === "citizen" && styles.roleTabTextActive,
+              ]}
+            >
+              📱 CITIZEN SOS
+            </Text>
           </TouchableOpacity>
 
-          {/* SEVERITY LEVEL SELECTOR */}
-          <View style={styles.severityContainer}>
-            <Text style={styles.sectionLabel}>EMERGENCY SEVERITY LEVEL</Text>
-            <View style={styles.severityRow}>
-              {[
-                { level: 4, label: "Critical", icon: "🚨" },
-                { level: 3, label: "High", icon: "⚠️" },
-                { level: 2, label: "Medium", icon: "🩹" },
-              ].map((item) => (
-                <TouchableOpacity
-                  key={item.level}
-                  style={[
-                    styles.severityButton,
-                    severity === item.level && styles.severityButtonActive,
-                    severity === item.level && {
-                      borderColor:
-                        item.level === 4
-                          ? theme.colors.primaryRed
-                          : item.level === 3
-                          ? theme.colors.warningAmber
-                          : theme.colors.accentCyan,
-                    },
-                  ]}
-                  onPress={() => setSeverity(item.level)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 16 }}>{item.icon}</Text>
-                  <Text
-                    style={[
-                      styles.severityText,
-                      severity === item.level && styles.severityTextActive,
-                    ]}
-                  >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* GIANT PULSATING SOS BUTTON */}
-          <View style={styles.buttonWrapper}>
-            {/* Concentric Pulsing Wave */}
-            <Animated.View
+          <TouchableOpacity
+            style={[
+              styles.roleTab,
+              appRole === "driver" && styles.roleTabActive,
+            ]}
+            onPress={() => setAppRole("driver")}
+          >
+            <Text
               style={[
-                styles.pulseRing,
-                {
-                  transform: [{ scale: ringScale }],
-                  opacity: ringOpacity,
-                },
+                styles.roleTabText,
+                appRole === "driver" && styles.roleTabTextActive,
               ]}
-            />
-
-            <Animated.View
-              style={{
-                transform: [{ scale: pulseAnim }],
-              }}
             >
-              <TouchableOpacity
-                style={styles.sosButton}
-                onPress={handleSOSPress}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="large" color="#FFFFFF" />
-                    <Text style={styles.loadingText}>CALCULATING ROUTE...</Text>
-                  </View>
-                ) : (
-                  <View style={styles.buttonInner}>
-                    <Text style={styles.sosSymbol}>🚨</Text>
-                    <Text style={styles.sosText}>SOS</Text>
-                    <Text style={styles.sosSubtext}>ONE-TAP CALL</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-
-          <Text style={styles.helperNotice}>
-            Pressing SOS automatically runs Dijkstra's algorithm to find and dispatch
-            the closest available ambulance and reserve a hospital bed.
-          </Text>
-        </ScrollView>
-      ) : (
-        /* ACTIVE DISPATCH HUD */
-        <ScrollView
-          contentContainerStyle={styles.hudContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ACTIVE DISPATCH BANNER */}
-          <View style={styles.dispatchedBanner}>
-            <View style={styles.pulseDot} />
-            <Text style={styles.dispatchedBannerText}>AMBULANCE EN ROUTE</Text>
-          </View>
-
-          {/* ETA HERO CARD */}
-          <View style={styles.etaCard}>
-            <Text style={styles.etaLabel}>ESTIMATED ARRIVAL TIME</Text>
-            <View style={styles.etaRow}>
-              <Text style={styles.etaValue}>{remainingEta}</Text>
-              <Text style={styles.etaUnit}>MINS</Text>
-            </View>
-            <Text style={styles.etaDistance}>
-              Distance: {dispatchResult.ambulanceDistanceKm} km • Road Clearance Granted
+              🚑 DRIVER HUD
             </Text>
-          </View>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-          {/* AMBULANCE & DRIVER DETAILS */}
-          <View style={styles.card}>
-            <Text style={styles.cardHeader}>🚑 ASSIGNED AMBULANCE</Text>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Vehicle Unit:</Text>
-              <Text style={styles.cardValHighlight}>
-                Ambulance #{dispatchResult.assignedAmbulance?.id}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Driver Name:</Text>
-              <Text style={styles.cardVal}>
-                {dispatchResult.assignedAmbulance?.driverName}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Driver Contact:</Text>
-              <Text style={styles.cardVal}>
-                {dispatchResult.assignedAmbulance?.phone}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Current Station:</Text>
-              <Text style={styles.cardVal}>
-                {dispatchResult.assignedAmbulance?.location}
-              </Text>
-            </View>
-          </View>
+      {/* ==================== CITIZEN VIEW ==================== */}
+      {appRole === "citizen" ? (
+        !dispatchResult ? (
+          /* IDLE SCREEN - HUGE SOS BUTTON */
+          <ScrollView
+            contentContainerStyle={styles.idleContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* LOCATION SELECTOR BAR */}
+            <TouchableOpacity
+              style={styles.locationBar}
+              onPress={() => setShowLocationModal(true)}
+              activeOpacity={0.8}
+            >
+              <View style={styles.locationIconBg}>
+                <Text style={{ fontSize: 18 }}>📍</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.locationLabel}>CURRENT LOCATION</Text>
+                <Text style={styles.locationValue}>
+                  {selectedLocation}, Karachi
+                </Text>
+              </View>
+              <Text style={styles.changeText}>Tap to change ▾</Text>
+            </TouchableOpacity>
 
-          {/* DESTINATION HOSPITAL DETAILS */}
-          <View style={styles.card}>
-            <Text style={styles.cardHeader}>🏥 DESTINATION HOSPITAL</Text>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Facility:</Text>
-              <Text style={styles.cardValHighlight}>
-                {dispatchResult.assignedHospital?.name}
-              </Text>
+            {/* SEVERITY LEVEL SELECTOR */}
+            <View style={styles.severityContainer}>
+              <Text style={styles.sectionLabel}>EMERGENCY SEVERITY LEVEL</Text>
+              <View style={styles.severityRow}>
+                {[
+                  { level: 4, label: "Critical", icon: "🚨" },
+                  { level: 3, label: "High", icon: "⚠️" },
+                  { level: 2, label: "Medium", icon: "🩹" },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.level}
+                    style={[
+                      styles.severityButton,
+                      severity === item.level && styles.severityButtonActive,
+                      severity === item.level && {
+                        borderColor:
+                          item.level === 4
+                            ? theme.colors.primaryRed
+                            : item.level === 3
+                            ? theme.colors.warningAmber
+                            : theme.colors.accentCyan,
+                      },
+                    ]}
+                    onPress={() => setSeverity(item.level)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ fontSize: 16 }}>{item.icon}</Text>
+                    <Text
+                      style={[
+                        styles.severityText,
+                        severity === item.level && styles.severityTextActive,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Location:</Text>
-              <Text style={styles.cardVal}>
-                {dispatchResult.assignedHospital?.location}
-              </Text>
-            </View>
-            <View style={styles.cardRow}>
-              <Text style={styles.cardKey}>Bed Allocation:</Text>
-              <Text style={[styles.cardVal, { color: theme.colors.successGreen }]}>
-                1 Bed Reserved ({dispatchResult.assignedHospital?.availableBeds} remaining)
-              </Text>
-            </View>
-          </View>
 
-          {/* DIJKSTRA SHORTEST PATH ROUTE */}
-          <View style={styles.card}>
-            <Text style={styles.cardHeader}>🛣️ DIJKSTRA SHORTEST ROUTE</Text>
-            <View style={styles.routeContainer}>
-              {dispatchResult.ambulanceRoute?.length > 1 ? (
-                dispatchResult.ambulanceRoute.map((node, index) => (
+            {/* GIANT PULSATING SOS BUTTON */}
+            <View style={styles.buttonWrapper}>
+              <Animated.View
+                style={[
+                  styles.pulseRing,
+                  {
+                    transform: [{ scale: ringScale }],
+                    opacity: ringOpacity,
+                  },
+                ]}
+              />
+
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <TouchableOpacity
+                  style={styles.sosButton}
+                  onPress={handleSOSPress}
+                  disabled={loading}
+                  activeOpacity={0.85}
+                >
+                  {loading ? (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#FFFFFF" />
+                      <Text style={styles.loadingText}>CALCULATING ROUTE...</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.buttonInner}>
+                      <Text style={styles.sosSymbol}>🚨</Text>
+                      <Text style={styles.sosText}>SOS</Text>
+                      <Text style={styles.sosSubtext}>ONE-TAP CALL</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+
+            <Text style={styles.helperNotice}>
+              Pressing SOS runs Dijkstra's algorithm to find and dispatch
+              the closest available ambulance and reserve a hospital bed.
+            </Text>
+          </ScrollView>
+        ) : (
+          /* ACTIVE DISPATCH HUD FOR CITIZEN */
+          <ScrollView
+            contentContainerStyle={styles.hudContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.dispatchedBanner}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.dispatchedBannerText}>AMBULANCE EN ROUTE</Text>
+            </View>
+
+            <View style={styles.etaCard}>
+              <Text style={styles.etaLabel}>ESTIMATED ARRIVAL TIME</Text>
+              <View style={styles.etaRow}>
+                <Text style={styles.etaValue}>{remainingEta}</Text>
+                <Text style={styles.etaUnit}>MINS</Text>
+              </View>
+              <Text style={styles.etaDistance}>
+                Distance: {dispatchResult.ambulanceDistanceKm} km • Direct Shortest Route
+              </Text>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardHeader}>🚑 ASSIGNED AMBULANCE</Text>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardKey}>Vehicle Unit:</Text>
+                <Text style={styles.cardValHighlight}>
+                  Ambulance #{dispatchResult.assignedAmbulance?.id}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardKey}>Driver Name:</Text>
+                <Text style={styles.cardVal}>
+                  {dispatchResult.assignedAmbulance?.driverName}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardKey}>Driver Contact:</Text>
+                <Text style={styles.cardVal}>
+                  {dispatchResult.assignedAmbulance?.phone}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardHeader}>🏥 DESTINATION HOSPITAL</Text>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardKey}>Facility:</Text>
+                <Text style={styles.cardValHighlight}>
+                  {dispatchResult.assignedHospital?.name}
+                </Text>
+              </View>
+              <View style={styles.cardRow}>
+                <Text style={styles.cardKey}>Bed Allocation:</Text>
+                <Text style={[styles.cardVal, { color: theme.colors.successGreen }]}>
+                  1 Bed Reserved ({dispatchResult.assignedHospital?.availableBeds} remaining)
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.card}>
+              <Text style={styles.cardHeader}>🛣️ DIJKSTRA SHORTEST ROUTE</Text>
+              <View style={styles.routeContainer}>
+                {dispatchResult.ambulanceRoute?.map((node, index) => (
                   <View key={index} style={styles.routeStep}>
                     <View style={styles.stepCircle}>
                       <Text style={styles.stepNum}>{index + 1}</Text>
@@ -369,23 +425,142 @@ export default function App() {
                       <Text style={styles.stepArrow}>➔</Text>
                     )}
                   </View>
-                ))
-              ) : (
-                <Text style={styles.stepText}>
-                  Direct Dispatch within {dispatchResult.patientLocation} sector
-                </Text>
-              )}
+                ))}
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleCancel}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.cancelButtonText}>CANCEL EMERGENCY CALL</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        )
+      ) : (
+        /* ==================== DRIVER HUD VIEW ==================== */
+        <ScrollView
+          contentContainerStyle={styles.hudContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* VEHICLE UNIT SELECTOR */}
+          <View style={styles.card}>
+            <Text style={styles.cardHeader}>🚑 DRIVER VEHICLE UNIT</Text>
+            <View style={styles.driverUnitRow}>
+              {[
+                { id: 101, name: "Ali (#101)" },
+                { id: 102, name: "Ahmed (#102)" },
+                { id: 103, name: "Usman (#103)" },
+                { id: 104, name: "Tariq (#104)" },
+              ].map((amb) => (
+                <TouchableOpacity
+                  key={amb.id}
+                  style={[
+                    styles.driverUnitBtn,
+                    driverAmbId === amb.id && styles.driverUnitBtnActive,
+                  ]}
+                  onPress={() => setDriverAmbId(amb.id)}
+                >
+                  <Text
+                    style={[
+                      styles.driverUnitBtnText,
+                      driverAmbId === amb.id && styles.driverUnitBtnTextActive,
+                    ]}
+                  >
+                    {amb.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
-          {/* CANCEL EMERGENCY BUTTON */}
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={handleCancel}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.cancelButtonText}>CANCEL EMERGENCY CALL</Text>
-          </TouchableOpacity>
+          {/* DRIVER MISSION HUD */}
+          {driverMission ? (
+            <>
+              <View style={[styles.dispatchedBanner, { backgroundColor: "#78350F", borderColor: "#D97706" }]}>
+                <View style={[styles.pulseDot, { backgroundColor: "#F59E0B" }]} />
+                <Text style={[styles.dispatchedBannerText, { color: "#FDE68A" }]}>
+                  MISSION ACTIVE: {driverStatus.toUpperCase()}
+                </Text>
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.cardHeader}>🚨 EMERGENCY INCIDENT</Text>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardKey}>Emergency ID:</Text>
+                  <Text style={styles.cardValHighlight}>{driverMission.emergencyId}</Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardKey}>Patient Sector:</Text>
+                  <Text style={styles.cardValHighlight}>📍 {driverMission.patientLocation}</Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardKey}>Severity:</Text>
+                  <Text style={[styles.cardVal, { color: "#EF4444", fontWeight: "bold" }]}>
+                    {driverMission.severity}
+                  </Text>
+                </View>
+                <View style={styles.cardRow}>
+                  <Text style={styles.cardKey}>Target Hospital:</Text>
+                  <Text style={styles.cardVal}>{driverMission.hospitalName}</Text>
+                </View>
+              </View>
+
+              <View style={styles.card}>
+                <Text style={styles.cardHeader}>🗺️ NAVIGATION ROUTE</Text>
+                <View style={styles.routeContainer}>
+                  {driverMission.route?.map((step, idx) => (
+                    <View key={idx} style={styles.routeStep}>
+                      <View style={styles.stepCircle}>
+                        <Text style={styles.stepNum}>{idx + 1}</Text>
+                      </View>
+                      <Text style={styles.stepText}>{step}</Text>
+                      {idx < driverMission.route.length - 1 && (
+                        <Text style={styles.stepArrow}>➔</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              {/* ACTION PROGRESS BUTTONS */}
+              <View style={styles.driverActionsCard}>
+                <Text style={styles.cardHeader}>⚡ MISSION ACTION STATUS</Text>
+                <TouchableOpacity
+                  style={[styles.driverActionBtn, { backgroundColor: "#D97706" }]}
+                  onPress={() => handleDriverStatusChange("At Scene")}
+                  disabled={updatingDriver}
+                >
+                  <Text style={styles.driverActionText}>📍 Arrived at Patient Scene</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.driverActionBtn, { backgroundColor: "#2563EB" }]}
+                  onPress={() => handleDriverStatusChange("Transporting")}
+                  disabled={updatingDriver}
+                >
+                  <Text style={styles.driverActionText}>🏥 En Route to Hospital</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.driverActionBtn, { backgroundColor: "#059669" }]}
+                  onPress={() => handleDriverStatusChange("Completed")}
+                  disabled={updatingDriver}
+                >
+                  <Text style={styles.driverActionText}>✓ Handover & Finish Mission</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <View style={styles.emptyMissionCard}>
+              <Text style={{ fontSize: 44 }}>🟢</Text>
+              <Text style={styles.emptyMissionTitle}>Standing By</Text>
+              <Text style={styles.emptyMissionSubtitle}>
+                Ambulance #{driverAmbId} is currently available. When a citizen taps SOS, the Dijkstra engine will assign this unit automatically!
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
 
@@ -394,9 +569,7 @@ export default function App() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Select Emergency Zone</Text>
-            <Text style={styles.modalSubtitle}>
-              Choose the simulated city location:
-            </Text>
+            <Text style={styles.modalSubtitle}>Choose the simulated city location:</Text>
             {locations.map((loc) => (
               <TouchableOpacity
                 key={loc}
@@ -443,8 +616,8 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    paddingTop: 18,
-    paddingBottom: 14,
+    paddingTop: 16,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: "#1E293B",
     maxWidth: 520,
@@ -460,27 +633,47 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: {
     color: "#FFFFFF",
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "800",
     letterSpacing: 1,
   },
   title: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: "900",
     color: theme.colors.textWhite,
     letterSpacing: 1.5,
+    marginBottom: 10,
   },
-  subtitle: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: theme.colors.textSubtle,
-    letterSpacing: 2,
-    marginTop: 2,
+  roleToggleRow: {
+    flexDirection: "row",
+    backgroundColor: "#161E2E",
+    padding: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#334155",
+    gap: 6,
+  },
+  roleTab: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  roleTabActive: {
+    backgroundColor: theme.colors.primaryRed,
+  },
+  roleTabText: {
+    color: "#94A3B8",
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  roleTabTextActive: {
+    color: "#FFFFFF",
   },
   idleContent: {
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingVertical: 20,
     maxWidth: 520,
     width: "100%",
     alignSelf: "center",
@@ -494,7 +687,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 18,
   },
   locationIconBg: {
     backgroundColor: theme.colors.bgCardActive,
@@ -521,7 +714,7 @@ const styles = StyleSheet.create({
   },
   severityContainer: {
     width: "100%",
-    marginBottom: 36,
+    marginBottom: 28,
   },
   sectionLabel: {
     color: theme.colors.textSubtle,
@@ -562,22 +755,22 @@ const styles = StyleSheet.create({
   buttonWrapper: {
     alignItems: "center",
     justifyContent: "center",
-    marginVertical: 25,
+    marginVertical: 15,
     position: "relative",
-    width: 250,
-    height: 250,
+    width: 240,
+    height: 240,
   },
   pulseRing: {
     position: "absolute",
-    width: 240,
-    height: 240,
-    borderRadius: 120,
+    width: 230,
+    height: 230,
+    borderRadius: 115,
     backgroundColor: theme.colors.primaryRed,
   },
   sosButton: {
-    width: 210,
-    height: 210,
-    borderRadius: 105,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     backgroundColor: theme.colors.primaryRedDark,
     alignItems: "center",
     justifyContent: "center",
@@ -593,21 +786,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sosSymbol: {
-    fontSize: 32,
+    fontSize: 30,
     marginBottom: 2,
   },
   sosText: {
     color: "#FFFFFF",
-    fontSize: 44,
+    fontSize: 40,
     fontWeight: "900",
     letterSpacing: 3,
   },
   sosSubtext: {
     color: "#FEE2E2",
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.5,
-    marginTop: 4,
+    marginTop: 3,
   },
   loadingContainer: {
     alignItems: "center",
@@ -616,7 +809,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginTop: 10,
     fontWeight: "800",
-    fontSize: 13,
+    fontSize: 12,
     letterSpacing: 1,
   },
   helperNotice: {
@@ -628,7 +821,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   hudContainer: {
-    padding: 20,
+    padding: 16,
     maxWidth: 520,
     width: "100%",
     alignSelf: "center",
@@ -642,7 +835,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingVertical: 10,
-    marginBottom: 16,
+    marginBottom: 14,
     gap: 8,
   },
   pulseDot: {
@@ -662,9 +855,9 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.colors.primaryRed,
     borderRadius: 18,
-    padding: 20,
+    padding: 18,
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 14,
   },
   etaLabel: {
     color: theme.colors.textMuted,
@@ -680,12 +873,12 @@ const styles = StyleSheet.create({
   },
   etaValue: {
     color: theme.colors.primaryRed,
-    fontSize: 54,
+    fontSize: 48,
     fontWeight: "900",
   },
   etaUnit: {
     color: theme.colors.primaryRed,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "800",
   },
   etaDistance: {
@@ -697,13 +890,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.bgCard,
     borderRadius: 16,
     padding: 16,
-    marginBottom: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
   cardHeader: {
     color: theme.colors.textWhite,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: "800",
     letterSpacing: 1,
     marginBottom: 10,
@@ -780,6 +973,74 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 1,
   },
+  driverUnitRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  driverUnitBtn: {
+    backgroundColor: "#0B0F19",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  driverUnitBtnActive: {
+    borderColor: theme.colors.primaryRed,
+    backgroundColor: "#1E293B",
+  },
+  driverUnitBtnText: {
+    color: "#94A3B8",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  driverUnitBtnTextActive: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  driverActionsCard: {
+    backgroundColor: theme.colors.bgCard,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 10,
+  },
+  driverActionBtn: {
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  driverActionText: {
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  emptyMissionCard: {
+    backgroundColor: theme.colors.bgCard,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    padding: 30,
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  emptyMissionTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "bold",
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  emptyMissionSubtitle: {
+    color: "#94A3B8",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -838,4 +1099,3 @@ const styles = StyleSheet.create({
 });
 
 registerRootComponent(App);
-

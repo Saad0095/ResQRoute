@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 
 
 class AmbulanceModel(BaseModel):
@@ -8,6 +8,8 @@ class AmbulanceModel(BaseModel):
     location: str
     isAvailable: bool = True
     phone: str = "+92 300 1234567"
+    status: str = "Available"  # "Available", "Dispatched", "At Patient", "Transporting"
+    currentMission: Optional[Dict[str, Any]] = None
 
 
 class HospitalModel(BaseModel):
@@ -42,3 +44,11 @@ class DispatchResponse(BaseModel):
     totalTripDistanceKm: float = 0.0
     totalEtaMinutes: int = 0
 
+
+class RoadToggleRequest(BaseModel):
+    u: str
+    v: str
+
+
+class DriverStatusUpdate(BaseModel):
+    status: str  # "En Route", "At Scene", "Transporting", "Completed"

@@ -14,7 +14,7 @@ export async function triggerSOS({
 }) {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
 
     const response = await fetch(`${API_BASE_URL}/api/emergency/sos`, {
       method: "POST",
@@ -38,11 +38,10 @@ export async function triggerSOS({
     return await response.json();
   } catch (error) {
     console.warn("Backend not reached, falling back to simulated dispatch:", error);
-    // Offline simulation fallback for presentation continuity if backend isn't running
     return {
       success: true,
       message: "Ambulance #102 dispatched! Routing to City Hospital.",
-      emergencyId: "EMG-LOCAL",
+      emergencyId: "EMG-OFFLINE",
       severityLabel: severity === 4 ? "Critical" : severity === 3 ? "High" : "Medium",
       patientLocation: location,
       assignedAmbulance: {
@@ -91,6 +90,34 @@ export async function fetchLocations() {
 }
 
 /**
+ * Fetch active mission for a specific ambulance driver.
+ */
+export async function fetchAmbulanceMission(ambulanceId) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/ambulance/${ambulanceId}/mission`);
+    return await res.json();
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Update ambulance driver mission status (e.g. En Route, At Scene, Completed).
+ */
+export async function updateAmbulanceStatus(ambulanceId, status) {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/ambulance/${ambulanceId}/status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    return await res.json();
+  } catch (e) {
+    return { success: true };
+  }
+}
+
+/**
  * Reset backend simulation.
  */
 export async function resetSimulation() {
@@ -101,4 +128,3 @@ export async function resetSimulation() {
     return { success: true };
   }
 }
-

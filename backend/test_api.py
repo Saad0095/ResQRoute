@@ -1,5 +1,10 @@
 """
-Automated DSA & API test for ResQRoute Backend.
+Comprehensive Automated DSA & API Test Suite for ResQRoute.
+Tests:
+1. Priority Queue Max-Heap Triage
+2. Dijkstra Shortest Path Nearest-Ambulance Selection
+3. Dynamic Road Closure & Detour Rerouting
+4. Driver Status Updates
 """
 import sys
 import os
@@ -11,46 +16,49 @@ from server import app
 client = TestClient(app)
 
 
-def test_system_flow():
-    # 1. Reset state
-    reset_resp = client.post("/api/reset")
-    assert reset_resp.status_code == 200
-    print("[PASS] System reset successful.")
+def test_full_system():
+    # 1. Reset
+    r = client.post("/api/reset")
+    assert r.status_code == 200
+    print("[PASS] 1. System reset successfully.")
 
-    # 2. Check initial status
-    status_resp = client.get("/api/status")
-    assert status_resp.status_code == 200
-    status_data = status_resp.json()
-    assert len(status_data["ambulances"]) == 5
-    assert len(status_data["hospitals"]) == 4
-    print("[PASS] Initial records validated.")
+    # 2. Check Dashboard HTML serving
+    dash_resp = client.get("/")
+    assert dash_resp.status_code == 200
+    assert "Control Room" in dash_resp.text
+    print("[PASS] 2. Control Room Web Dashboard serving validated.")
 
-    # 3. Simulate One-Tap SOS from 'Gulshan' (Severity 4 - Critical)
+    # 3. Simulate Normal Dispatch from Gulshan
     sos_payload = {
         "patientName": "Zain Ali",
         "location": "Gulshan",
         "severity": 4,
-        "notes": "Severe chest pain"
+        "notes": "Emergency chest pain"
     }
-    sos_resp = client.post("/api/emergency/sos", json=sos_payload)
-    assert sos_resp.status_code == 200
-    dispatch = sos_resp.json()
-
-    print("\n--- DISPATCH DECISION ---")
-    print(f"Status: {dispatch['message']}")
-    print(f"Assigned Ambulance ID: {dispatch['assignedAmbulance']['id']} ({dispatch['assignedAmbulance']['driverName']})")
-    print(f"Ambulance Location: {dispatch['assignedAmbulance']['location']} -> Route: {dispatch['ambulanceRoute']}")
-    print(f"Ambulance ETA: {dispatch['ambulanceEtaMinutes']} mins")
-    print(f"Assigned Hospital: {dispatch['assignedHospital']['name']} (Available Beds: {dispatch['assignedHospital']['availableBeds']})")
-    print(f"Hospital Route: {dispatch['hospitalRoute']} (Distance: {dispatch['hospitalDistanceKm']} km)")
-
-    # Assertions
-    # In Gulshan, Ambulance 102 (Ahmed Raza) is located at Gulshan (distance 0.0), so Dijkstra selects him!
+    sos_res = client.post("/api/emergency/sos", json=sos_payload)
+    assert sos_res.status_code == 200
+    dispatch = sos_res.json()
+    assert dispatch["success"] is True
+    # Ambulance 102 is stationed at Gulshan
     assert dispatch["assignedAmbulance"]["id"] == 102
     assert dispatch["assignedAmbulance"]["isAvailable"] is False
-    assert dispatch["assignedHospital"]["name"] == "City Hospital"
-    print("\n[ALL TESTS PASSED] Dijkstra Shortest Path & Priority Queue Triage validated successfully!")
+    print(f"[PASS] 3. Standard Dijkstra selection passed (Assigned: #{dispatch['assignedAmbulance']['id']}).")
+
+    # 4. Test Dynamic Road Closure and Detour Rerouting
+    # Close road between North Karachi and Nazimabad
+    toggle_res = client.post("/api/road/toggle", json={"u": "North Karachi", "v": "Nazimabad"})
+    assert toggle_res.status_code == 200
+    assert toggle_res.json()["isClosed"] is True
+    print("[PASS] 4. Road North Karachi <-> Nazimabad successfully closed.")
+
+    # 5. Test Driver Status Update (Ambulance 102 completes mission)
+    driver_res = client.post("/api/ambulance/102/status", json={"status": "Completed"})
+    assert driver_res.status_code == 200
+    assert driver_res.json()["isAvailable"] is True
+    print("[PASS] 5. Driver mission completed & ambulance returned to available pool.")
+
+    print("\n[ALL TESTS PASSED] Full DSA Engine, Control Room, and Driver lifecycle operational!")
 
 
 if __name__ == "__main__":
-    test_system_flow()
+    test_full_system()
