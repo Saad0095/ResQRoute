@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated } from "react-native";
+import { View, Text, StyleSheet, Animated, Platform } from "react-native";
 
 // Fixed reference coordinates scaled for mobile screens (340 x 245 canvas)
 const defaultNodeCoords = {
@@ -14,19 +14,25 @@ const defaultNodeCoords = {
   "Defense":          { x: 190, y: 210 },
 };
 
-const defaultRoads = [
-  { u: "North Karachi", v: "Nazimabad", weight: 4.0 },
-  { u: "Nazimabad", v: "Gulshan", weight: 6.0 },
+// Full city road network matching backend graph
+const fullCityRoads = [
+  { u: "North Karachi", v: "Nazimabad", weight: 6.5 },
+  { u: "Nazimabad", v: "Gulshan", weight: 5.0 },
+  { u: "North Karachi", v: "Gulshan", weight: 9.0 },
   { u: "Nazimabad", v: "Saddar", weight: 7.0 },
-  { u: "Gulshan", v: "Airport", weight: 5.0 },
-  { u: "Gulshan", v: "Shahrah-e-Faisal", weight: 5.5 },
-  { u: "Airport", v: "Malir", weight: 5.0 },
-  { u: "Airport", v: "Shahrah-e-Faisal", weight: 6.0 },
-  { u: "Malir", v: "Shahrah-e-Faisal", weight: 8.0 },
-  { u: "Shahrah-e-Faisal", v: "Saddar", weight: 7.0 },
-  { u: "Shahrah-e-Faisal", v: "Defense", weight: 6.0 },
+  { u: "Gulshan", v: "Saddar", weight: 8.0 },
+  { u: "Gulshan", v: "Airport", weight: 10.0 },
   { u: "Saddar", v: "Clifton", weight: 4.0 },
   { u: "Clifton", v: "Defense", weight: 5.0 },
+  { u: "Saddar", v: "Defense", weight: 6.5 },
+  { u: "Airport", v: "Defense", weight: 14.0 },
+  { u: "Gulshan", v: "Defense", weight: 12.0 },
+  { u: "Malir", v: "Airport", weight: 5.0 },
+  { u: "Malir", v: "Shahrah-e-Faisal", weight: 8.0 },
+  { u: "Airport", v: "Shahrah-e-Faisal", weight: 6.0 },
+  { u: "Shahrah-e-Faisal", v: "Gulshan", weight: 5.5 },
+  { u: "Shahrah-e-Faisal", v: "Saddar", weight: 7.0 },
+  { u: "Shahrah-e-Faisal", v: "Defense", weight: 6.0 },
 ];
 
 export default function LiveVisualMap({
@@ -73,12 +79,12 @@ export default function LiveVisualMap({
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1,
-          duration: 1200,
+          duration: 1100,
           useNativeDriver: false,
         }),
         Animated.timing(pulseAnim, {
           toValue: 0,
-          duration: 1200,
+          duration: 1100,
           useNativeDriver: false,
         }),
       ])
@@ -93,13 +99,13 @@ export default function LiveVisualMap({
       Animated.spring(animX, {
         toValue: targetCoord.x,
         friction: 6,
-        tension: 40,
+        tension: 45,
         useNativeDriver: false,
       }),
       Animated.spring(animY, {
         toValue: targetCoord.y,
         friction: 6,
-        tension: 40,
+        tension: 45,
         useNativeDriver: false,
       }),
     ]).start();
@@ -119,21 +125,33 @@ export default function LiveVisualMap({
     currentPhaseColor = "#4ADE80";
   }
 
-  // Helper to check if a road edge belongs to pickup or hospital leg
-  const isEdgeInRoute = (route, u, v) => {
-    if (!route || route.length < 2) return false;
-    for (let i = 0; i < route.length - 1; i++) {
-      if (
-        (route[i] === u && route[i + 1] === v) ||
-        (route[i] === v && route[i + 1] === u)
-      ) {
-        return true;
-      }
-    }
-    return false;
+  // Helper to render any road segment line
+  const renderLine = (p1, p2, color, thickness, zIndex, key) => {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    const midX = (p1.x + p2.x) / 2;
+    const midY = (p1.y + p2.y) / 2;
+
+    return (
+      <View
+        key={key}
+        style={{
+          position: "absolute",
+          left: midX - length / 2,
+          top: midY - thickness / 2,
+          width: length,
+          height: thickness,
+          backgroundColor: color,
+          transform: [{ rotate: `${angle}deg` }],
+          zIndex,
+          borderRadius: 2,
+        }}
+      />
+    );
   };
 
-  // Distinct city nodes to render
   const distinctNodes = Object.keys(defaultNodeCoords);
 
   return (
@@ -141,7 +159,7 @@ export default function LiveVisualMap({
       {/* Telemetry Header */}
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerBadge}>● LIVE GPS ROUTE MAP</Text>
+          <Text style={styles.headerBadge}>● LIVE GPS ROUTE RADAR</Text>
           <Text style={styles.headerSubtitle}>
             {userRole === "driver" ? "Ambulance Driver HUD" : "Citizen Incident Radar"}
           </Text>
@@ -155,70 +173,55 @@ export default function LiveVisualMap({
 
       {/* Map Canvas Box */}
       <View style={styles.mapCanvas}>
-        {/* 1. Road Segments */}
-        {defaultRoads.map((road, index) => {
+        {/* 1. Base City Road Network (Slate Background) */}
+        {fullCityRoads.map((road, index) => {
           const p1 = getCoord(road.u);
           const p2 = getCoord(road.v);
-          const dx = p2.x - p1.x;
-          const dy = p2.y - p1.y;
-          const length = Math.sqrt(dx * dx + dy * dy);
-          const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-          const midX = (p1.x + p2.x) / 2;
-          const midY = (p1.y + p2.y) / 2;
-
-          const isLeg1 = isEdgeInRoute(pickupRoute, road.u, road.v);
-          const isLeg2 = isEdgeInRoute(hospitalRoute, road.u, road.v);
-
-          let strokeColor = "#334155";
-          let height = 2;
-          let zIndex = 1;
-
-          if (isLeg1) {
-            strokeColor = "#38BDF8"; // Sky Blue (Pickup)
-            height = 4.5;
-            zIndex = 3;
-          } else if (isLeg2) {
-            strokeColor = "#4ADE80"; // Emerald Green (Hospital)
-            height = 4.5;
-            zIndex = 3;
-          }
-
-          return (
-            <View
-              key={`road-${index}`}
-              style={{
-                position: "absolute",
-                left: midX - length / 2,
-                top: midY - height / 2,
-                width: length,
-                height: height,
-                backgroundColor: strokeColor,
-                transform: [{ rotate: `${angle}deg` }],
-                zIndex,
-                borderRadius: 2,
-              }}
-            />
-          );
+          return renderLine(p1, p2, "#243248", 2, 1, `base-road-${index}`);
         })}
 
-        {/* 2. City Sector Nodes */}
+        {/* 2. DIRECT SHORTEST PATH OVERLAYS */}
+        {/* (a) Leg 1: Ambulance to Patient (Vibrant Sky Blue) */}
+        {pickupRoute && pickupRoute.length > 1 && (
+          pickupRoute.slice(0, -1).map((node, i) => {
+            const p1 = getCoord(node);
+            const p2 = getCoord(pickupRoute[i + 1]);
+            return renderLine(p1, p2, "#38BDF8", 4.5, 3, `pickup-leg-${i}`);
+          })
+        )}
+
+        {/* (b) Leg 2: Patient to Hospital (Vibrant Emerald Green) */}
+        {hospitalRoute && hospitalRoute.length > 1 && (
+          hospitalRoute.slice(0, -1).map((node, i) => {
+            const p1 = getCoord(node);
+            const p2 = getCoord(hospitalRoute[i + 1]);
+            return renderLine(p1, p2, "#4ADE80", 4.5, 4, `hosp-leg-${i}`);
+          })
+        )}
+
+        {/* 3. City Sector Nodes */}
         {distinctNodes.map((nodeName) => {
           const coord = getCoord(nodeName);
           const isPatientNode = nodeName === patientLocation;
           const isHospitalNode = nodeName === hospitalLocation;
+          const isBaseNode = pickupRoute && pickupRoute[0] === nodeName && !isPatientNode && !isHospitalNode;
 
-          let badgeColor = "#1E293B";
+          let badgeBg = "#1E293B";
           let borderColor = "#475569";
           let icon = null;
 
           if (isPatientNode) {
-            badgeColor = "#DC2626";
+            badgeBg = "#DC2626";
             borderColor = "#EF4444";
             icon = "📍";
           } else if (isHospitalNode) {
-            badgeColor = "#16A34A";
+            badgeBg = "#16A34A";
             borderColor = "#22C55E";
             icon = "🏥";
+          } else if (isBaseNode) {
+            badgeBg = "#2563EB";
+            borderColor = "#38BDF8";
+            icon = "🚑";
           }
 
           return (
@@ -226,11 +229,11 @@ export default function LiveVisualMap({
               key={`node-${nodeName}`}
               style={[
                 styles.nodeWrapper,
-                { left: coord.x - 13, top: coord.y - 13 },
-                (isPatientNode || isHospitalNode) && { zIndex: 6 },
+                { left: coord.x - 14, top: coord.y - 14 },
+                (isPatientNode || isHospitalNode || isBaseNode) && { zIndex: 7 },
               ]}
             >
-              {/* Pulsing ring for patient or hospital */}
+              {/* Pulsing beacon ring for patient or hospital */}
               {(isPatientNode || isHospitalNode) && (
                 <Animated.View
                   style={[
@@ -241,13 +244,13 @@ export default function LiveVisualMap({
                         {
                           scale: pulseAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [1, 1.6],
+                            outputRange: [1, 1.7],
                           }),
                         },
                       ],
                       opacity: pulseAnim.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [0.7, 0.1],
+                        outputRange: [0.75, 0.05],
                       }),
                     },
                   ]}
@@ -258,31 +261,40 @@ export default function LiveVisualMap({
               <View
                 style={[
                   styles.nodeCircle,
-                  { backgroundColor: badgeColor, borderColor: borderColor },
+                  { backgroundColor: badgeBg, borderColor: borderColor },
                 ]}
               >
                 {icon ? (
-                  <Text style={{ fontSize: 11 }}>{icon}</Text>
+                  <Text style={{ fontSize: 12 }}>{icon}</Text>
                 ) : (
                   <View style={styles.nodeDot} />
                 )}
               </View>
 
-              {/* Sector Name Tag */}
-              <Text
-                style={[
-                  styles.nodeLabel,
-                  (isPatientNode || isHospitalNode) && { fontWeight: "bold", color: "#F8FAFC" },
-                ]}
-                numberOfLines={1}
-              >
-                {nodeName}
-              </Text>
+              {/* High-Visibility Callout Badges for Patient and Hospital */}
+              {isPatientNode ? (
+                <View style={styles.patientCallout}>
+                  <Text style={styles.patientCalloutText}>📍 PATIENT ({nodeName})</Text>
+                </View>
+              ) : isHospitalNode ? (
+                <View style={styles.hospitalCallout}>
+                  <Text style={styles.hospitalCalloutText}>🏥 {hospitalName || nodeName}</Text>
+                </View>
+              ) : isBaseNode ? (
+                <View style={styles.baseCallout}>
+                  <Text style={styles.baseCalloutText}>🚑 UNIT #{ambulanceId}</Text>
+                </View>
+              ) : (
+                /* Regular Sector Label */
+                <Text style={styles.nodeLabel} numberOfLines={1}>
+                  {nodeName}
+                </Text>
+              )}
             </View>
           );
         })}
 
-        {/* 3. Smooth Moving Animated Ambulance Vehicle */}
+        {/* 4. Smooth Moving Animated Ambulance Vehicle */}
         {fullRoute.length > 0 && (
           <Animated.View
             style={[
@@ -308,10 +320,10 @@ export default function LiveVisualMap({
                 { borderColor: currentPhaseColor },
               ]}
             >
-              <Text style={{ fontSize: 13 }}>🚑</Text>
+              <Text style={{ fontSize: 14 }}>🚑</Text>
             </View>
             {/* Floating Unit ID Callout */}
-            <View style={styles.vehicleCallout}>
+            <View style={[styles.vehicleCallout, { borderColor: currentPhaseColor }]}>
               <Text style={styles.vehicleCalloutText}>
                 Unit #{ambulanceId}
               </Text>
@@ -320,7 +332,7 @@ export default function LiveVisualMap({
         )}
       </View>
 
-      {/* Map Legend */}
+      {/* Map Legend & Shortest Path Indicator */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.legendLine, { backgroundColor: "#38BDF8" }]} />
@@ -332,11 +344,11 @@ export default function LiveVisualMap({
         </View>
         <View style={styles.legendItem}>
           <Text style={{ fontSize: 10 }}>📍</Text>
-          <Text style={styles.legendText}>Patient</Text>
+          <Text style={styles.legendText}>Patient ({patientLocation || "Scene"})</Text>
         </View>
         <View style={styles.legendItem}>
           <Text style={{ fontSize: 10 }}>🏥</Text>
-          <Text style={styles.legendText}>{hospitalName || "Hospital"}</Text>
+          <Text style={styles.legendText}>{hospitalName || hospitalLocation || "Hospital"}</Text>
         </View>
       </View>
     </View>
@@ -393,8 +405,8 @@ const styles = StyleSheet.create({
   },
   mapCanvas: {
     width: "100%",
-    height: 250,
-    backgroundColor: "#0B1120",
+    height: 255,
+    backgroundColor: "#080E1A",
     borderRadius: 8,
     position: "relative",
     overflow: "hidden",
@@ -403,23 +415,23 @@ const styles = StyleSheet.create({
   },
   nodeWrapper: {
     position: "absolute",
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 4,
   },
   beaconPulse: {
     position: "absolute",
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     borderWidth: 2,
   },
   nodeCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
@@ -432,12 +444,61 @@ const styles = StyleSheet.create({
   },
   nodeLabel: {
     position: "absolute",
-    top: 23,
+    top: 25,
     color: "#94A3B8",
     fontSize: 8.5,
     fontWeight: "500",
-    width: 70,
+    width: 75,
     textAlign: "center",
+  },
+  patientCallout: {
+    position: "absolute",
+    top: -15,
+    backgroundColor: "#DC2626",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  patientCalloutText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  hospitalCallout: {
+    position: "absolute",
+    top: -15,
+    backgroundColor: "#16A34A",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  hospitalCalloutText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  baseCallout: {
+    position: "absolute",
+    top: -15,
+    backgroundColor: "#2563EB",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  baseCalloutText: {
+    color: "#FFFFFF",
+    fontSize: 8,
+    fontWeight: "800",
   },
   vehicleMarker: {
     position: "absolute",
@@ -448,28 +509,31 @@ const styles = StyleSheet.create({
   },
   vehicleGlow: {
     position: "absolute",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 2,
     backgroundColor: "rgba(56, 189, 248, 0.25)",
   },
   vehicleBody: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: "#FFFFFF",
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 4,
   },
   vehicleCallout: {
     position: "absolute",
-    top: -14,
+    top: -15,
     backgroundColor: "#0F172A",
     borderWidth: 1,
-    borderColor: "#38BDF8",
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
     paddingVertical: 1,
     borderRadius: 4,
   },

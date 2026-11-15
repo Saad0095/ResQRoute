@@ -30,3 +30,31 @@ html.dark body {
   background-color: #020617;
   color: #f8fafc;
 }
+
+/* Global Button & Interactive Element Hover Enhancements */
+button,
+[role="button"],
+select,
+input[type="submit"],
+input[type="button"],
+a {
+  cursor: pointer !important;
+  user-select: none;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover:not(:disabled),
+[role="button"]:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+button:disabled,
+[role="button"]:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.6;
+}

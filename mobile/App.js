@@ -381,7 +381,7 @@ export default function App() {
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => setShowServerModal(true)}
-          style={{ position: "absolute", top: 14, right: 14, padding: 6, zIndex: 10 }}
+          style={{ position: "absolute", top: 14, right: 14, padding: 6, zIndex: 10, ...(Platform.OS === "web" ? { cursor: "pointer" } : {}) }}
         >
           <Text style={{ fontSize: 16 }}>⚙️</Text>
         </TouchableOpacity>
@@ -785,6 +785,7 @@ export default function App() {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 8,
+                ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
               }}
               onPress={() => {
                 const text = [
@@ -1063,6 +1064,7 @@ export default function App() {
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 6,
+                      ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
                     }}
                     onPress={() => {
                       const text = [
@@ -1219,13 +1221,13 @@ export default function App() {
 
             <View style={{ flexDirection: "row", gap: 10 }}>
               <TouchableOpacity
-                style={{ flex: 1, backgroundColor: "#E2E8F0", paddingVertical: 12, borderRadius: 10, alignItems: "center" }}
+                style={{ flex: 1, backgroundColor: "#E2E8F0", paddingVertical: 12, borderRadius: 10, alignItems: "center", ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}) }}
                 onPress={() => setShowVerifyModal(false)}
               >
                 <Text style={{ fontWeight: "600", color: "#475569", fontSize: 13 }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={{ flex: 1, backgroundColor: "#DC2626", paddingVertical: 12, borderRadius: 10, alignItems: "center" }}
+                style={{ flex: 1, backgroundColor: "#DC2626", paddingVertical: 12, borderRadius: 10, alignItems: "center", ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}) }}
                 onPress={handleConfirmVerifiedSOS}
               >
                 <Text style={{ fontWeight: "bold", color: "#FFFFFF", fontSize: 13 }}>Confirm & Call</Text>
@@ -1340,6 +1342,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 8,
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   roleTabActive: {
     backgroundColor: "#DC2626",
@@ -1375,6 +1378,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowRadius: 6,
     elevation: 2,
+    ...(Platform.OS === "web" ? { cursor: "pointer" } : {}),
   },
   locationIconBg: {
     backgroundColor: "#F1F5F9",
@@ -1427,6 +1431,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 10,
     gap: 6,
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   severityButtonActive: {
     backgroundColor: "#F8FAFC",
@@ -1469,6 +1474,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     borderWidth: 6,
     borderColor: theme.colors.primaryRedLight,
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   buttonInner: {
     alignItems: "center",
@@ -1664,6 +1670,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 6,
     marginBottom: 30,
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   cancelButtonText: {
     color: theme.colors.primaryRed,
@@ -1727,6 +1734,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 10,
     alignItems: "center",
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   driverActionText: {
     color: "#FFFFFF",
@@ -1799,6 +1807,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     marginTop: 4,
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   loginBtnText: {
     color: "#FFFFFF",
@@ -1824,6 +1833,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     alignItems: "center",
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   demoBtnText: {
     color: "#2563EB",
@@ -1878,6 +1888,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginVertical: 2,
     backgroundColor: "#F8FAFC",
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   modalItemActive: {
     backgroundColor: "#E2E8F0",
@@ -1897,6 +1908,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginTop: 14,
+    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   modalCloseText: {
     color: theme.colors.textWhite,
