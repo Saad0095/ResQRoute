@@ -21,6 +21,7 @@ bool Ambulance::getAvailibility() const
     return isAvailable;
 }
 
+
 void Ambulance::updateAvailibility()
 {
     isAvailable = !isAvailable;
