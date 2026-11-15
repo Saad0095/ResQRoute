@@ -55,6 +55,7 @@ export default function App() {
   const [dispatchResult, setDispatchResult] = useState(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [callerName, setCallerName] = useState("");
   const [callerPhone, setCallerPhone] = useState("");
   const [emergencyType, setEmergencyType] = useState("Cardiac / Severe Injury");
   const [remainingEta, setRemainingEta] = useState(0);
@@ -328,8 +329,16 @@ export default function App() {
     setShowVerifyModal(false);
     setLoading(true);
     try {
+      const pName = callerName.trim()
+        ? callerPhone.trim()
+          ? `${callerName.trim()} (${callerPhone.trim()})`
+          : callerName.trim()
+        : callerPhone.trim()
+        ? `Caller (${callerPhone.trim()})`
+        : "Emergency Caller";
+
       const response = await triggerSOS({
-        patientName: callerPhone ? `Caller (${callerPhone})` : "Emergency Caller",
+        patientName: pName,
         location: selectedLocation,
         severity: severity,
         notes: `Verified Case: ${emergencyType}`,
@@ -356,6 +365,8 @@ export default function App() {
   const handleDismissCompleted = () => {
     setDispatchResult(null);
     setLiveEmergencyStatus("Idle");
+    setCallerName("");
+    setCallerPhone("");
   };
 
   const handleCancel = () => {
@@ -367,6 +378,8 @@ export default function App() {
       if (window.confirm("Are you sure you want to cancel the emergency dispatch?")) {
         setDispatchResult(null);
         setLiveEmergencyStatus("Idle");
+        setCallerName("");
+        setCallerPhone("");
         resetSimulation();
       }
       return;
@@ -383,6 +396,8 @@ export default function App() {
           onPress: () => {
             setDispatchResult(null);
             setLiveEmergencyStatus("Idle");
+            setCallerName("");
+            setCallerPhone("");
             resetSimulation();
           },
         },
@@ -1116,6 +1131,14 @@ export default function App() {
                     <Text style={styles.cardKey}>Emergency ID:</Text>
                     <Text style={styles.cardValHighlight}>{driverMission.emergencyId}</Text>
                   </View>
+                  {driverMission.patientName ? (
+                    <View style={styles.cardRow}>
+                      <Text style={styles.cardKey}>Caller / Patient:</Text>
+                      <Text style={[styles.cardValHighlight, { color: "#0F172A" }]}>
+                        👤 {driverMission.patientName}
+                      </Text>
+                    </View>
+                  ) : null}
                   <View style={styles.cardRow}>
                     <Text style={styles.cardKey}>Current Vehicle Sector:</Text>
                     <Text style={styles.cardValHighlight}>🚑 {driverLocation || driverMission.route?.[0] || "En Route"}</Text>
@@ -1496,6 +1519,18 @@ export default function App() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#334155", marginBottom: 4 }}>
+              Caller / Patient Name (Optional):
+            </Text>
+            <TextInput
+              style={[styles.textInput, { marginBottom: 12 }]}
+              placeholder="e.g. Tariq Mehmood"
+              placeholderTextColor="#94A3B8"
+              value={callerName}
+              onChangeText={setCallerName}
+              autoCapitalize="words"
+            />
 
             <Text style={{ fontSize: 12, fontWeight: "600", color: "#334155", marginBottom: 4 }}>
               Callback Contact Phone (Optional):
