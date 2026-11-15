@@ -182,22 +182,22 @@ export default function LiveVisualMap({
 
         {/* 2. DIRECT SHORTEST PATH OVERLAYS */}
         {/* (a) Leg 1: Ambulance to Patient (Vibrant Sky Blue) */}
-        {pickupRoute && pickupRoute.length > 1 && (
-          pickupRoute.slice(0, -1).map((node, i) => {
-            const p1 = getCoord(node);
-            const p2 = getCoord(pickupRoute[i + 1]);
-            return renderLine(p1, p2, "#38BDF8", 4.5, 3, `pickup-leg-${i}`);
-          })
-        )}
+        {pickupRoute && pickupRoute.length > 1
+          ? pickupRoute.slice(0, -1).map((node, i) => {
+              const p1 = getCoord(node);
+              const p2 = getCoord(pickupRoute[i + 1]);
+              return renderLine(p1, p2, "#38BDF8", 4.5, 3, `pickup-leg-${i}`);
+            })
+          : null}
 
         {/* (b) Leg 2: Patient to Hospital (Vibrant Emerald Green) */}
-        {hospitalRoute && hospitalRoute.length > 1 && (
-          hospitalRoute.slice(0, -1).map((node, i) => {
-            const p1 = getCoord(node);
-            const p2 = getCoord(hospitalRoute[i + 1]);
-            return renderLine(p1, p2, "#4ADE80", 4.5, 4, `hosp-leg-${i}`);
-          })
-        )}
+        {hospitalRoute && hospitalRoute.length > 1
+          ? hospitalRoute.slice(0, -1).map((node, i) => {
+              const p1 = getCoord(node);
+              const p2 = getCoord(hospitalRoute[i + 1]);
+              return renderLine(p1, p2, "#4ADE80", 4.5, 4, `hosp-leg-${i}`);
+            })
+          : null}
 
         {/* 3. City Sector Nodes */}
         {distinctNodes.map((nodeName) => {
@@ -234,7 +234,7 @@ export default function LiveVisualMap({
               ]}
             >
               {/* Pulsing beacon ring for patient or hospital */}
-              {(isPatientNode || isHospitalNode) && (
+              {(isPatientNode || isHospitalNode) ? (
                 <Animated.View
                   style={[
                     styles.beaconPulse,
@@ -255,7 +255,7 @@ export default function LiveVisualMap({
                     },
                   ]}
                 />
-              )}
+              ) : null}
 
               {/* Node Circle */}
               <View
@@ -295,7 +295,7 @@ export default function LiveVisualMap({
         })}
 
         {/* 4. Smooth Moving Animated Ambulance Vehicle */}
-        {fullRoute.length > 0 && (
+        {fullRoute.length > 0 ? (
           <Animated.View
             style={[
               styles.vehicleMarker,
@@ -329,7 +329,7 @@ export default function LiveVisualMap({
               </Text>
             </View>
           </Animated.View>
-        )}
+        ) : null}
       </View>
 
       {/* Map Legend & Shortest Path Indicator */}

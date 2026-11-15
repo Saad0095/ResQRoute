@@ -453,11 +453,11 @@ export default function App() {
                   <Text style={styles.locationValue}>
                     {selectedLocation}, Karachi
                   </Text>
-                  {liveGpsCoords && (
+                  {liveGpsCoords ? (
                     <Text style={{ color: "#10B981", fontSize: 10, marginTop: 2 }}>
                       GPS: {liveGpsCoords.lat}° N, {liveGpsCoords.lng}° E (Live)
                     </Text>
-                  )}
+                  ) : null}
                 </View>
                 <Text style={styles.changeText}>Change ▾</Text>
               </TouchableOpacity>
@@ -644,7 +644,7 @@ export default function App() {
               return (
                 <View style={styles.card}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <Text style={styles.cardHeader}>🗺️ LIVE 2-STAGE JOURNEY TRACKER</Text>
+                    <Text style={styles.cardHeader}>🗺️ LIVE GPS ROUTE RADAR</Text>
                     <Text style={{ color: phaseBadgeColor, fontSize: 11, fontWeight: "bold" }}>
                       ● Tracking
                     </Text>
@@ -698,7 +698,7 @@ export default function App() {
                             >
                               {node}
                             </Text>
-                            {index < pickupRoute.length - 1 && (
+                            {index < pickupRoute.length - 1 ? (
                               <Text
                                 style={[
                                   styles.stepArrow,
@@ -707,7 +707,7 @@ export default function App() {
                               >
                                 ➔
                               </Text>
-                            )}
+                            ) : null}
                           </View>
                         );
                       })}
@@ -753,7 +753,7 @@ export default function App() {
                             >
                               {node}
                             </Text>
-                            {index < hospitalRoute.length - 1 && (
+                            {index < hospitalRoute.length - 1 ? (
                               <Text
                                 style={[
                                   styles.stepArrow,
@@ -762,7 +762,7 @@ export default function App() {
                               >
                                 ➔
                               </Text>
-                            )}
+                            ) : null}
                           </View>
                         );
                       })}
@@ -802,11 +802,11 @@ export default function App() {
                 if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
                   navigator.clipboard.writeText(text);
                 }
-                showAlert("Copied", "Complete 2-stage emergency route copied to clipboard!");
+                showAlert("Copied", "Complete emergency route directions copied to clipboard!");
               }}
             >
               <Text style={{ fontSize: 14 }}>📋</Text>
-              <Text style={{ color: "#E2E8F0", fontSize: 12, fontWeight: "600" }}>Copy Complete 2-Stage Route & Details</Text>
+              <Text style={{ color: "#E2E8F0", fontSize: 12, fontWeight: "600" }}>Copy Route Directions & Details</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -832,11 +832,11 @@ export default function App() {
                 Sign in with your official vehicle credentials to access mission navigation.
               </Text>
 
-              {authError && (
+              {authError ? (
                 <View style={styles.errorBox}>
                   <Text style={styles.errorText}>⚠️ {authError}</Text>
                 </View>
-              )}
+              ) : null}
 
               <Text style={styles.inputLabel}>Driver Official Email:</Text>
               <TextInput
@@ -915,10 +915,23 @@ export default function App() {
             {/* DRIVER MISSION HUD */}
             {driverMission ? (
               <>
-                <View style={[styles.dispatchedBanner, { backgroundColor: "#78350F", borderColor: "#D97706" }]}>
-                  <View style={[styles.pulseDot, { backgroundColor: "#F59E0B" }]} />
-                  <Text style={[styles.dispatchedBannerText, { color: "#FDE68A" }]}>
-                    ACTIVE CALL: {driverStatus.toUpperCase()}
+                <View style={[
+                  styles.dispatchedBanner,
+                  driverStatus === "At Scene"
+                    ? { backgroundColor: "#78350F", borderColor: "#D97706" }
+                    : driverStatus === "Transporting"
+                    ? { backgroundColor: "#1E3A8A", borderColor: "#2563EB" }
+                    : { backgroundColor: "#78350F", borderColor: "#D97706" }
+                ]}>
+                  <View style={[
+                    styles.pulseDot,
+                    driverStatus === "Transporting" ? { backgroundColor: "#38BDF8" } : { backgroundColor: "#F59E0B" }
+                  ]} />
+                  <Text style={[
+                    styles.dispatchedBannerText,
+                    driverStatus === "Transporting" ? { color: "#BFDBFE" } : { color: "#FDE68A" }
+                  ]}>
+                    ACTIVE CALL: {driverStatus === "At Scene" ? "AT PATIENT SCENE" : driverStatus === "Transporting" ? "EN ROUTE TO HOSPITAL" : "EN ROUTE TO PATIENT"}
                   </Text>
                 </View>
 
@@ -971,19 +984,19 @@ export default function App() {
                 />
 
                 <View style={styles.card}>
-                  <Text style={styles.cardHeader}>🗺️ 2-STAGE FASTEST EMERGENCY ROUTE</Text>
+                  <Text style={styles.cardHeader}>🗺️ FASTEST EMERGENCY ROUTE</Text>
                   
                   {/* Stage 1: To Patient */}
                   <View style={{ marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#E2E8F0" }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
                       <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0284C7" }}>
-                        📍 STAGE 1: Pickup Route (Base ➔ Patient)
+                        📍 LEG 1: Pickup Route (Base ➔ Patient)
                       </Text>
-                      {driverMission.ambulanceDistanceKm && (
+                      {driverMission.ambulanceDistanceKm ? (
                         <Text style={{ fontSize: 10, color: "#64748B" }}>
                           {driverMission.ambulanceDistanceKm} km • ~{driverMission.ambulanceEtaMinutes} mins
                         </Text>
-                      )}
+                      ) : null}
                     </View>
                     <View style={styles.routeContainer}>
                       {(driverMission.ambulanceRoute || [driverLocation, driverMission.patientLocation]).map((step, idx, arr) => (
@@ -1000,13 +1013,14 @@ export default function App() {
                           </View>
                           <Text style={[
                             styles.stepText,
+                            { color: "#0F172A" },
                             idx === arr.length - 1 ? { fontWeight: "bold", color: "#DC2626" } : {}
                           ]}>
                             {step}
                           </Text>
-                          {idx < arr.length - 1 && (
+                          {idx < arr.length - 1 ? (
                             <Text style={styles.stepArrow}>➔</Text>
-                          )}
+                          ) : null}
                         </View>
                       ))}
                     </View>
@@ -1016,13 +1030,13 @@ export default function App() {
                   <View style={{ marginBottom: 6 }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
                       <Text style={{ fontSize: 11, fontWeight: "bold", color: "#16A34A" }}>
-                        🏥 STAGE 2: Emergency Delivery (Patient ➔ Hospital)
+                        🏥 LEG 2: Emergency Delivery (Patient ➔ Hospital)
                       </Text>
-                      {driverMission.hospitalDistanceKm && (
+                      {driverMission.hospitalDistanceKm ? (
                         <Text style={{ fontSize: 10, color: "#64748B" }}>
                           {driverMission.hospitalDistanceKm} km • ~{driverMission.hospitalEtaMinutes} mins
                         </Text>
-                      )}
+                      ) : null}
                     </View>
                     <View style={styles.routeContainer}>
                       {(driverMission.hospitalRoute || [driverMission.patientLocation, driverMission.hospitalLocation]).map((step, idx, arr) => (
@@ -1039,13 +1053,14 @@ export default function App() {
                           </View>
                           <Text style={[
                             styles.stepText,
+                            { color: "#0F172A" },
                             idx === arr.length - 1 ? { fontWeight: "bold", color: "#16A34A" } : {}
                           ]}>
                             {step}
                           </Text>
-                          {idx < arr.length - 1 && (
+                          {idx < arr.length - 1 ? (
                             <Text style={styles.stepArrow}>➔</Text>
-                          )}
+                          ) : null}
                         </View>
                       ))}
                     </View>
@@ -1073,48 +1088,147 @@ export default function App() {
                         `Patient Sector: ${driverMission.patientLocation}`,
                         `Destination Hospital: ${driverMission.hospitalName} (${driverMission.hospitalLocation})`,
                         ``,
-                        `📍 STAGE 1 (Pickup Route): ${(driverMission.ambulanceRoute || [driverLocation, driverMission.patientLocation]).join(" ➔ ")}`,
-                        `🏥 STAGE 2 (Hospital Delivery Route): ${(driverMission.hospitalRoute || [driverMission.patientLocation, driverMission.hospitalLocation]).join(" ➔ ")}`,
+                        `📍 LEG 1 (Ambulance to Patient): ${(driverMission.ambulanceRoute || [driverLocation, driverMission.patientLocation]).join(" ➔ ")}`,
+                        `🏥 LEG 2 (Patient to Hospital Delivery): ${(driverMission.hospitalRoute || [driverMission.patientLocation, driverMission.hospitalLocation]).join(" ➔ ")}`,
                         ``,
                         `🛣️ Full Route: ${driverMission.route?.join(" ➔ ")}`,
                       ].join("\n");
                       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
                         navigator.clipboard.writeText(text);
                       }
-                      showAlert("Copied", "Mission route & target hospital copied to clipboard!");
+                      showAlert("Copied", "Turn-by-turn route directions copied to clipboard!");
                     }}
                   >
                     <Text style={{ fontSize: 13 }}>📋</Text>
-                    <Text style={{ color: "#334155", fontSize: 11, fontWeight: "600" }}>Copy Complete 2-Stage Navigation</Text>
+                    <Text style={{ color: "#334155", fontSize: 11, fontWeight: "600" }}>Copy Route Directions</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* ACTION PROGRESS BUTTONS */}
                 <View style={styles.driverActionsCard}>
-                  <Text style={styles.cardHeader}>⚡ MISSION PROGRESSION</Text>
-                  <TouchableOpacity
-                    style={[styles.driverActionBtn, { backgroundColor: "#D97706" }]}
-                    onPress={() => handleDriverStatusChange("At Scene")}
-                    disabled={updatingDriver}
-                  >
-                    <Text style={styles.driverActionText}>📍 Arrived at Patient Scene</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <Text style={styles.cardHeader}>⚡ MISSION PROGRESSION</Text>
+                    <View style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: driverStatus === "At Scene" ? "#FEF3C7" : driverStatus === "Transporting" ? "#DBEAFE" : "#FEF3C7"
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        fontWeight: "bold",
+                        color: driverStatus === "At Scene" ? "#B45309" : driverStatus === "Transporting" ? "#1D4ED8" : "#B45309"
+                      }}>
+                        {driverStatus === "At Scene" ? "Step 2 of 3: At Patient" : driverStatus === "Transporting" ? "Step 3 of 3: Transporting" : "Step 1 of 3: En Route to Patient"}
+                      </Text>
+                    </View>
+                  </View>
 
-                  <TouchableOpacity
-                    style={[styles.driverActionBtn, { backgroundColor: "#2563EB" }]}
-                    onPress={() => handleDriverStatusChange("Transporting")}
-                    disabled={updatingDriver}
-                  >
-                    <Text style={styles.driverActionText}>🏥 En Route to Hospital</Text>
-                  </TouchableOpacity>
+                  {/* Visual Step Progress Bar */}
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                    <View style={{ alignItems: "center", flex: 1 }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "#10B981", alignItems: "center", justifyContent: "center" }}>
+                        <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "bold" }}>✓</Text>
+                      </View>
+                      <Text style={{ fontSize: 9.5, color: "#10B981", fontWeight: "bold", marginTop: 3 }}>Dispatched</Text>
+                    </View>
+                    <View style={{ height: 2, flex: 1, backgroundColor: (driverStatus === "At Scene" || driverStatus === "Transporting") ? "#10B981" : "#E2E8F0" }} />
+                    <View style={{ alignItems: "center", flex: 1 }}>
+                      <View style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: driverStatus === "Transporting" ? "#10B981" : driverStatus === "At Scene" ? "#D97706" : "#94A3B8",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "bold" }}>
+                          {driverStatus === "Transporting" ? "✓" : "2"}
+                        </Text>
+                      </View>
+                      <Text style={{
+                        fontSize: 9.5,
+                        color: driverStatus === "Transporting" ? "#10B981" : driverStatus === "At Scene" ? "#D97706" : "#94A3B8",
+                        fontWeight: "bold",
+                        marginTop: 3
+                      }}>
+                        At Patient
+                      </Text>
+                    </View>
+                    <View style={{ height: 2, flex: 1, backgroundColor: driverStatus === "Transporting" ? "#2563EB" : "#E2E8F0" }} />
+                    <View style={{ alignItems: "center", flex: 1 }}>
+                      <View style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 11,
+                        backgroundColor: driverStatus === "Transporting" ? "#2563EB" : "#94A3B8",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}>
+                        <Text style={{ color: "#FFF", fontSize: 10, fontWeight: "bold" }}>3</Text>
+                      </View>
+                      <Text style={{
+                        fontSize: 9.5,
+                        color: driverStatus === "Transporting" ? "#2563EB" : "#94A3B8",
+                        fontWeight: "bold",
+                        marginTop: 3
+                      }}>
+                        Hospital
+                      </Text>
+                    </View>
+                  </View>
 
-                  <TouchableOpacity
-                    style={[styles.driverActionBtn, { backgroundColor: "#059669" }]}
-                    onPress={() => handleDriverStatusChange("Completed")}
-                    disabled={updatingDriver}
-                  >
-                    <Text style={styles.driverActionText}>✓ Hospital Handover & Complete</Text>
-                  </TouchableOpacity>
+                  {/* ONLY THE ACTIVE ACTION BUTTON IS SHOWN */}
+                  {(!driverStatus || driverStatus === "Dispatched" || driverStatus === "Available" || driverStatus === "Busy") ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.driverActionBtn,
+                        { backgroundColor: "#D97706" },
+                        Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {},
+                      ]}
+                      onPress={() => handleDriverStatusChange("At Scene")}
+                      disabled={updatingDriver}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.driverActionText}>
+                        {updatingDriver ? "Updating Status..." : "📍 Step 1: Arrived at Patient Scene"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {driverStatus === "At Scene" ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.driverActionBtn,
+                        { backgroundColor: "#2563EB" },
+                        Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {},
+                      ]}
+                      onPress={() => handleDriverStatusChange("Transporting")}
+                      disabled={updatingDriver}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.driverActionText}>
+                        {updatingDriver ? "Updating Status..." : "🏥 Step 2: Depart Patient Scene ➔ En Route to Hospital"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {driverStatus === "Transporting" ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.driverActionBtn,
+                        { backgroundColor: "#059669" },
+                        Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {},
+                      ]}
+                      onPress={() => handleDriverStatusChange("Completed")}
+                      disabled={updatingDriver}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.driverActionText}>
+                        {updatingDriver ? "Updating Status..." : "✓ Step 3: Arrived at Hospital & Complete Handover"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </>
             ) : (
@@ -1122,7 +1236,7 @@ export default function App() {
                 <Text style={{ fontSize: 44 }}>🟢</Text>
                 <Text style={styles.emptyMissionTitle}>Standing By</Text>
                 <Text style={styles.emptyMissionSubtitle}>
-                  Vehicle #{driverUser.ambulanceId || driverAmbId} is currently stationed at{" "}
+                  Vehicle #{driverUser?.ambulanceId || driverAmbId} is currently stationed at{" "}
                   <Text style={{ fontWeight: "bold", color: "#0F172A" }}>📍 {driverLocation || "Base Station"}</Text> and available in the fleet.
                 </Text>
                 <Text style={[styles.emptyMissionSubtitle, { marginTop: 8, fontSize: 11, color: "#94A3B8" }]}>
@@ -1160,9 +1274,9 @@ export default function App() {
                 >
                   📍 {loc}
                 </Text>
-                {selectedLocation === loc && (
+                {selectedLocation === loc ? (
                   <Text style={{ color: theme.colors.primaryRed, fontWeight: "bold" }}>✓</Text>
-                )}
+                ) : null}
               </TouchableOpacity>
             ))}
             <TouchableOpacity
