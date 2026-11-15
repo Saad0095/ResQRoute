@@ -1,16 +1,100 @@
-# React + Vite
+# 🖥️ ResQRoute Web Control Room & Admin Portal
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> **Real-Time Emergency Dispatch, Fleet Control & Route Navigation Dashboard** powered by React, Vite, and Tailwind CSS.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 🚀 How to Run the Web Dashboard
 
-## React Compiler
+### Prerequisites
+1. **Node.js** (v18 or higher installed on your computer).
+2. Backend API running locally at `http://localhost:8000` OR live in the cloud at `https://resqroute-cq1x.onrender.com`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+### Step 1: Install Dependencies (First Time Only)
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+```bash
+cd web
+npm install
+```
+
+---
+
+### Step 2: Start the Development Server
+
+```bash
+cd web
+node start.js
+```
+*(Alternatively, you can run `npm run dev`)*
+
+- **Local URL**: `http://localhost:5173`
+- Open `http://localhost:5173` in your browser.
+
+---
+
+### Step 3: Production Build (Optional)
+
+To verify or generate production static assets:
+
+```bash
+cd web
+node start.js build
+```
+
+The output bundle is generated inside `web/dist/`.
+
+---
+
+## 🔐 Login Credentials
+
+| Role | Email | Password | Permissions |
+| :--- | :--- | :--- | :--- |
+| **System Admin** | `admin@resqroute.org` | `admin123` | Full control room access, user/staff management, system reset, infrastructure deletion. |
+| **Emergency Dispatcher** | `dispatcher@resqroute.org` | `admin123` | Emergency call routing, real-time map, road traffic toggle, fleet status, hospital bed adjustments. |
+
+*(Quick Fill buttons are provided directly on the login page for one-click demo access).*
+
+---
+
+## 🌐 Deploying to Vercel
+
+1. Import your GitHub repository into Vercel.
+2. In the import settings:
+   - **Root Directory**: `web`
+   - **Framework Preset**: `Vite` (detected automatically)
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+3. Under **Environment Variables**, add:
+   - **Key**: `VITE_API_URL`
+   - **Value**: `https://resqroute-cq1x.onrender.com`
+4. Click **Deploy**.
+
+---
+
+## 🌟 Key Features
+
+1. **Operations Overview**:
+   - Real-time KPI statistics (Ambulances Ready, Hospital Beds Free, Active Missions, Total Calls Logged).
+   - Quick Emergency Call dispatch form.
+   - Live Emergency Call Queue.
+2. **City Sectors & Emergency Map**:
+   - Canvas-based interactive map displaying ambulances, hospitals, and dynamic arterial road networks.
+   - **Emergency Route Navigator & Trip Inspector**: Test fastest routes between sectors (e.g. *Malir* ➔ *Shahrah-e-Faisal* ➔ *Saddar*).
+   - **Road Access & Detours**: Click any road segment to simulate closures/traffic and observe instant live rerouting.
+   - **+ Add Sector / Location**: Add custom sectors and connect them to existing zones with distance.
+   - **+ Connect Road**: Draw custom bidirectional roads between sectors.
+3. **Emergency Call Registration**:
+   - Input caller details, select sector from dynamic list, set urgency level (Critical, High, Medium, Low), and trigger automatic closest-ambulance dispatch.
+4. **Fleet & Ambulances Management**:
+   - Real-time ambulance status tracking (`Available`, `At Scene`, `Transporting`).
+   - One-click ambulance release button.
+   - Register new ambulance units into the fleet.
+5. **Hospital Bed Allocation**:
+   - Live bed occupancy tracking across major healthcare facilities.
+   - Update bed capacity modal dialog.
+6. **Call History & Audit Trail**:
+   - Complete chronological log of emergency dispatches with distance, ETA, and copyable incident summaries.
+7. **User & Staff Management (Admin Only)**:
+   - Create, soft-deactivate, and manage accounts for dispatchers and drivers.
