@@ -19,11 +19,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0F19"
-      }
+      },
+      "package": "com.saad0095.resqroutemobile"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "a1222708-a6b3-42dc-a094-d9f58f237f72"
+      }
     }
   }
 }
-
