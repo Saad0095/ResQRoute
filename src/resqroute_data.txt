@@ -1,0 +1,35 @@
+[LOCATIONS]
+North Karachi
+Nazimabad
+Gulshan
+Saddar
+Clifton
+DHA
+Korangi
+Malir
+Airport
+[ROADS]
+North Karachi|Nazimabad|6
+North Karachi|Gulshan|11
+Nazimabad|Gulshan|7
+Nazimabad|Saddar|9
+Gulshan|Saddar|10
+Gulshan|Airport|8
+Gulshan|Malir|11
+Saddar|Airport|12
+Saddar|Clifton|6
+Saddar|Korangi|13
+Clifton|DHA|5
+DHA|Korangi|9
+Korangi|Malir|10
+Malir|Airport|7
+[AMBULANCES]
+101|Ali|North Karachi|1
+102|Ahmed|Gulshan|0
+103|Usman|Nazimabad|1
+1|Hassaan|Airport|1
+[HOSPITALS]
+201|City Hospital|Gulshan|12
+202|Central Hospital|Nazimabad|5
+203|Coastal Hospital|Clifton|8
+[EMERGENCIES]
