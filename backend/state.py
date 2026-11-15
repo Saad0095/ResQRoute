@@ -151,6 +151,40 @@ def register_node_and_coords(
             }
 
 
+def update_location_record(
+    old_name: str,
+    new_name: Optional[str] = None,
+    x: Optional[int] = None,
+    y: Optional[int] = None,
+) -> Dict[str, Any]:
+    global custom_node_coords, ambulances, hospitals
+    clean_old = old_name.strip()
+    clean_new = new_name.strip() if new_name else clean_old
+
+    if x is not None and y is not None:
+        custom_node_coords[clean_new] = {"x": int(x), "y": int(y)}
+    elif clean_new not in custom_node_coords and clean_old in custom_node_coords:
+        custom_node_coords[clean_new] = custom_node_coords[clean_old]
+
+    if clean_new != clean_old:
+        if clean_old in custom_node_coords:
+            del custom_node_coords[clean_old]
+        graph.rename_node(clean_old, clean_new)
+        for amb in ambulances:
+            if amb.location == clean_old:
+                amb.location = clean_new
+        for hosp in hospitals:
+            if hosp.location == clean_old:
+                hosp.location = clean_new
+
+    return {
+        "success": True,
+        "oldName": clean_old,
+        "name": clean_new,
+        "coords": custom_node_coords.get(clean_new)
+    }
+
+
 def add_ambulance_record(
     amb_id: int,
     driver_name: str,

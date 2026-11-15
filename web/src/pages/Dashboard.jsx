@@ -17,6 +17,7 @@ import {
   createAmbulance,
   fetchIncidents,
   addLocation,
+  updateLocation,
   addRoad,
   planRoute,
 } from "../services/api";
@@ -81,6 +82,13 @@ export default function Dashboard({ user, onLogout }) {
   });
   const [showAddRoad, setShowAddRoad] = useState(false);
   const [newRoad, setNewRoad] = useState({ u: "Malir", v: "Saddar", weight: 15.0 });
+  const [showEditLocation, setShowEditLocation] = useState(false);
+  const [editLocation, setEditLocation] = useState({
+    selected: "Gulistan-e-Jauhar",
+    newName: "Gulistan-e-Jauhar",
+    x: 440,
+    y: 70,
+  });
 
   // Route Inspector (Test journeys e.g. Malir -> Saddar via Shahrah-e-Faisal)
   const [inspectorStart, setInspectorStart] = useState("Malir");
@@ -413,6 +421,26 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
+  const handleUpdateLocation = async (e) => {
+    e.preventDefault();
+    if (!editLocation.selected) {
+      showMsg("Please select a location to edit", true);
+      return;
+    }
+    try {
+      await updateLocation(editLocation.selected, {
+        newName: editLocation.newName.trim() || editLocation.selected,
+        x: parseInt(editLocation.x) || 440,
+        y: parseInt(editLocation.y) || 70,
+      });
+      showMsg(`Location "${editLocation.newName.trim() || editLocation.selected}" updated successfully!`);
+      setShowEditLocation(false);
+      await loadData();
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
   const handleInspectRoute = async (e) => {
     if (e) e.preventDefault();
     if (!inspectorStart || !inspectorDest || inspectorStart === inspectorDest) {
@@ -436,10 +464,23 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  // Dynamic sectors list from backend graph
-  const zonesList = state?.availableZones && state.availableZones.length > 0
-    ? state.availableZones
-    : ["Gulshan", "Nazimabad", "North Karachi", "Saddar", "Clifton", "Defense", "Airport", "Malir", "Shahrah-e-Faisal"];
+  // Dynamic sectors list from backend graph and coordinate registry (includes Gulistan-e-Jauhar)
+  const zonesList = Array.from(
+    new Set([
+      ...(state?.availableZones || []),
+      ...Object.keys(state?.coords || {}),
+      "Gulshan",
+      "Nazimabad",
+      "North Karachi",
+      "Saddar",
+      "Clifton",
+      "Defense",
+      "Airport",
+      "Malir",
+      "Shahrah-e-Faisal",
+      "Gulistan-e-Jauhar",
+    ])
+  ).sort();
 
   // Metrics
   const ambulancesReady = state?.ambulances?.filter((a) => a.isAvailable).length || 0;
@@ -576,15 +617,6 @@ export default function Dashboard({ user, onLogout }) {
 
         {/* Right Section: Controls, Theme & User Profile */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 whitespace-nowrap text-xs">
-          <button
-            onClick={handleReset}
-            title="Reset simulation to default state"
-            className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition flex items-center gap-1"
-          >
-            <span>↺</span>
-            <span className="hidden sm:inline">Reset</span>
-          </button>
-
           <button
             onClick={toggleTheme}
             title="Toggle Light / Dark mode"
@@ -900,6 +932,22 @@ export default function Dashboard({ user, onLogout }) {
                     className="px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition"
                   >
                     <span>+</span> Add Sector / Location
+                  </button>
+                  <button
+                    onClick={() => {
+                      const first = zonesList[0] || "Gulistan-e-Jauhar";
+                      const c = state?.coords?.[first] || { x: 440, y: 70 };
+                      setEditLocation({
+                        selected: first,
+                        newName: first,
+                        x: c.x,
+                        y: c.y,
+                      });
+                      setShowEditLocation(true);
+                    }}
+                    className="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs shadow-sm flex items-center gap-1.5 transition"
+                  >
+                    <span>✏️</span> Edit Sector / Location
                   </button>
                   <button
                     onClick={() => setShowAddRoad(true)}
@@ -2136,7 +2184,7 @@ export default function Dashboard({ user, onLogout }) {
                   🛣️
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Connect Two City Sectors</h3>
+                  <h3 className="font-bold text-sm text-slate-900 dark:white">Connect Two City Sectors</h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">Create or update a bidirectional road artery</p>
                 </div>
               </div>
@@ -2203,6 +2251,169 @@ export default function Dashboard({ user, onLogout }) {
                   className="px-4 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"
                 >
                   Save Road
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 7. EDIT SECTOR / LOCATION MODAL */}
+      {showEditLocation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
+                  ✏️
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Edit Sector / Location</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Update map coordinates or rename sector</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditLocation(false)}
+                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-sm transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateLocation} className="p-6 space-y-4 text-xs">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Select Sector to Edit *</label>
+                  <select
+                    value={editLocation.selected}
+                    onChange={(e) => {
+                      const sel = e.target.value;
+                      const c = state?.coords?.[sel] || { x: 440, y: 70 };
+                      setEditLocation({
+                        selected: sel,
+                        newName: sel,
+                        x: c.x,
+                        y: c.y,
+                      });
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-600 transition"
+                  >
+                    {zonesList.map((z) => (
+                      <option key={z} value={z}>{z}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Sector Display Name *</label>
+                  <input
+                    required
+                    value={editLocation.newName}
+                    onChange={(e) => setEditLocation({ ...editLocation, newName: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Quick Nudge / Placement Presets
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5 mb-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditLocation({ ...editLocation, y: Math.max(50, editLocation.y - 25) })}
+                      className="py-1.5 px-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 text-slate-700 dark:text-slate-300 text-center font-medium transition text-[11px]"
+                    >
+                      ⬆️ Up (-25)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditLocation({ ...editLocation, y: Math.min(420, editLocation.y + 25) })}
+                      className="py-1.5 px-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 text-slate-700 dark:text-slate-300 text-center font-medium transition text-[11px]"
+                    >
+                      ⬇️ Down (+25)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditLocation({ ...editLocation, x: Math.max(50, editLocation.x - 25) })}
+                      className="py-1.5 px-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 text-slate-700 dark:text-slate-300 text-center font-medium transition text-[11px]"
+                    >
+                      ⬅️ Left (-25)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditLocation({ ...editLocation, x: Math.min(800, editLocation.x + 25) })}
+                      className="py-1.5 px-2 rounded-lg bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 hover:border-indigo-500 text-slate-700 dark:text-slate-300 text-center font-medium transition text-[11px]"
+                    >
+                      ➡️ Right (+25)
+                    </button>
+                  </div>
+
+                  {editLocation.selected.toLowerCase().includes("jauhar") && (
+                    <button
+                      type="button"
+                      onClick={() => setEditLocation({ ...editLocation, x: 440, y: 70 })}
+                      className="w-full mt-1 py-1.5 px-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 font-semibold text-center text-[11px] transition hover:bg-indigo-100"
+                    >
+                      📍 Position Directly Above Gulshan: (440, 70)
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                      Canvas X <span className="text-[10px] text-slate-400 font-normal">(50-800)</span>
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      min="50"
+                      max="800"
+                      value={editLocation.x}
+                      onChange={(e) => setEditLocation({ ...editLocation, x: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-600 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                      Canvas Y <span className="text-[10px] text-slate-400 font-normal">(50-420)</span>
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      min="50"
+                      max="420"
+                      value={editLocation.y}
+                      onChange={(e) => setEditLocation({ ...editLocation, y: parseInt(e.target.value) || 0 })}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-indigo-600 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 rounded-lg p-2.5 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-600 dark:text-slate-300">
+                    📍 Placement: <strong>({editLocation.x}, {editLocation.y})</strong>
+                  </span>
+                  <span className="text-indigo-600 dark:text-indigo-400 font-semibold">
+                    Live updates map display and dispatch routing
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowEditLocation(false)}
+                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>

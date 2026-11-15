@@ -66,3 +66,9 @@ class AddRoadRequest(BaseModel):
     u: str
     v: str
     weight: float
+
+
+class EditLocationRequest(BaseModel):
+    newName: Optional[str] = None
+    x: int
+    y: int

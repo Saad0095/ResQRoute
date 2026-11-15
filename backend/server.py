@@ -20,7 +20,8 @@ from dsa.graph import CityGraph, build_default_city_map
 from dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
 from models import (
     AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse,
-    RoadToggleRequest, DriverStatusUpdate, AddLocationRequest, AddRoadRequest
+    RoadToggleRequest, DriverStatusUpdate, AddLocationRequest, AddRoadRequest,
+    EditLocationRequest
 )
 from database.seed import init_and_seed_db
 from database.connection import SessionLocal
@@ -96,6 +97,23 @@ def add_location(req: AddLocationRequest):
     return {
         "success": True,
         "name": name,
+        "locations": state.graph.get_nodes(),
+        "roads": state.graph.get_roads(),
+        "coords": state.custom_node_coords
+    }
+
+
+@app.put("/api/locations/{location_name}")
+def edit_location(location_name: str, req: EditLocationRequest):
+    """Edit location coordinates and/or rename sector in the city network."""
+    res = state.update_location_record(
+        old_name=location_name,
+        new_name=req.newName,
+        x=req.x,
+        y=req.y
+    )
+    return {
+        **res,
         "locations": state.graph.get_nodes(),
         "roads": state.graph.get_roads(),
         "coords": state.custom_node_coords

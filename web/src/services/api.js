@@ -94,6 +94,19 @@ export async function addLocation(payload) {
   return await res.json();
 }
 
+export async function updateLocation(locationName, payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${encodeURIComponent(locationName)}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to update location");
+  }
+  return await res.json();
+}
+
 export async function addRoad(payload) {
   const res = await fetch(`${API_BASE_URL}/api/roads`, {
     method: "POST",

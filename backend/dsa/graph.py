@@ -25,6 +25,22 @@ class CityGraph:
         if node not in self.adj_list:
             self.adj_list[node] = []
 
+    def rename_node(self, old_name: str, new_name: str) -> None:
+        if old_name not in self.adj_list or old_name == new_name:
+            return
+        edges = self.adj_list.pop(old_name)
+        self.adj_list[new_name] = []
+        for neighbor, weight in edges:
+            if neighbor in self.adj_list:
+                self.adj_list[neighbor] = [(new_name if n == old_name else n, w) for n, w in self.adj_list[neighbor]]
+                self.adj_list[new_name].append((neighbor, weight))
+        updated_closed = set()
+        for u, v in self.closed_roads:
+            nu = new_name if u == old_name else u
+            nv = new_name if v == old_name else v
+            updated_closed.add(self._edge_key(nu, nv))
+        self.closed_roads = updated_closed
+
     def add_road(self, u: str, v: str, weight: float) -> None:
         """Add bidirectional road between zones u and v with given distance/time."""
         self.add_node(u)
@@ -160,6 +176,9 @@ def build_default_city_map() -> CityGraph:
         ("Shahrah-e-Faisal", "Gulshan", 5.5),
         ("Shahrah-e-Faisal", "Saddar", 7.0),
         ("Shahrah-e-Faisal", "Defense", 6.0),
+        # Gulistan-e-Jauhar connections
+        ("Gulistan-e-Jauhar", "Gulshan", 3.5),
+        ("Gulistan-e-Jauhar", "Airport", 4.5),
     ]
 
     for u, v, w in roads:
