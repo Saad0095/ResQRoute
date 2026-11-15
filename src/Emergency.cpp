@@ -1,3 +1,4 @@
+// Emergency.cpp
 #include "Emergency.h"
 #include <iostream>
 #include <string>
@@ -17,16 +18,24 @@ int Emergency::getId() const
     return id;
 }
 
-string Emergency::getLocation() const { return location; }
-string Emergency::getPatientName() const { return patientName; }
+string Emergency::getPatientName() const
+{
+    return patientName;
+}
+
+string Emergency::getLocation() const
+{
+    return location;
+}
 
 int Emergency::getSeverity() const
 {
     return severity;
 }
 
-void Emergency::display()
+void Emergency::display() const
 {
+    // Turn the severity number into a readable word.
     string condition;
 
     switch (severity)
@@ -43,7 +52,6 @@ void Emergency::display()
     case 4:
         condition = "Critical";
         break;
-
     default:
         condition = "Unknown";
         break;
@@ -56,12 +64,15 @@ void Emergency::display()
     cout << "Condition: " << condition << "\n";
 }
 
+// How the priority_queue thinks:
+//   returning TRUE  means  "e1 is LESS urgent than e2"  (so e2 must come out first)
+//   returning FALSE means  "e1 is MORE urgent (or equal)"
 bool EmergencyPriority::operator()(const Emergency &e1, const Emergency &e2) const
 {
-    // False means a has high priotiy than b, and vice versa
+    // Same severity: the one registered earlier (smaller ID) goes first.
     if (e1.getSeverity() == e2.getSeverity())
         return e1.getId() > e2.getId();
 
-    // True means b has high priotiy than a, and vice versa
+    // Different severity: the higher severity goes first.
     return e1.getSeverity() < e2.getSeverity();
 }
