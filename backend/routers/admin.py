@@ -11,10 +11,14 @@ try:
     from database import get_db, UserDB
     from database.models_db import AmbulanceDB, HospitalDB
     from security import hash_password, get_current_user, require_roles
+    import state
+    from state import register_node_and_coords, add_ambulance_record, add_hospital_record
 except ImportError:
     from backend.database import get_db, UserDB
     from backend.database.models_db import AmbulanceDB, HospitalDB
     from backend.security import hash_password, get_current_user, require_roles
+    import backend.state as state
+    from backend.state import register_node_and_coords, add_ambulance_record, add_hospital_record
 
 router = APIRouter(prefix="/api/admin", tags=["Administration"])
 
@@ -40,6 +44,9 @@ class CreateAmbulanceRequest(BaseModel):
     driverName: str
     location: str
     phone: Optional[str] = None
+    x: Optional[int] = None
+    y: Optional[int] = None
+    connectedTo: Optional[str] = None
 
 
 class CreateHospitalRequest(BaseModel):
@@ -47,6 +54,9 @@ class CreateHospitalRequest(BaseModel):
     location: str
     totalBeds: int
     availableBeds: int
+    x: Optional[int] = None
+    y: Optional[int] = None
+    connectedTo: Optional[str] = None
 
 
 class UserOut(BaseModel):
@@ -185,7 +195,28 @@ def create_hospital(
     db.add(h)
     db.commit()
     db.refresh(h)
-    return {"success": True, "id": h.id, "name": h.name}
+
+    # Sync to in-memory state & graph coordinates
+    add_hospital_record(
+        name=h.name,
+        location=h.location,
+        total_beds=h.total_beds,
+        available_beds=h.available_beds,
+        hosp_id=h.id,
+        x=req.x,
+        y=req.y,
+        connected_to=req.connectedTo
+    )
+
+    return {
+        "success": True,
+        "id": h.id,
+        "name": h.name,
+        "location": h.location,
+        "totalBeds": h.total_beds,
+        "availableBeds": h.available_beds,
+        "coords": state.custom_node_coords.get(h.location)
+    }
 
 
 @router.patch("/hospitals/{hospital_id}/beds")
@@ -202,6 +233,15 @@ def update_hospital_beds(
     if req.totalBeds is not None:
         h.total_beds = req.totalBeds
     db.commit()
+
+    # Sync in-memory hospitals
+    for item in state.hospitals:
+        if item.id == hospital_id:
+            item.availableBeds = h.available_beds
+            if req.totalBeds is not None:
+                item.totalBeds = h.total_beds
+            break
+
     return {
         "success": True,
         "hospitalId": hospital_id,
@@ -221,6 +261,9 @@ def delete_hospital(
         raise HTTPException(404, "Hospital not found.")
     db.delete(h)
     db.commit()
+
+    # Sync in-memory hospitals
+    state.hospitals = [item for item in state.hospitals if item.id != hospital_id]
     return {"success": True, "message": "Hospital deleted."}
 
 
@@ -254,14 +297,32 @@ def create_ambulance(
         id=req.id,
         driver_name=req.driverName,
         location=req.location,
-        phone=req.phone,
+        phone=req.phone or "+92 300 0000000",
         status="Available",
         is_available=True,
     )
     db.add(a)
     db.commit()
     db.refresh(a)
-    return {"success": True, "id": a.id, "driverName": a.driver_name}
+
+    # Sync to in-memory fleet state & graph coordinates
+    add_ambulance_record(
+        amb_id=a.id,
+        driver_name=a.driver_name,
+        location=a.location,
+        phone=a.phone,
+        x=req.x,
+        y=req.y,
+        connected_to=req.connectedTo
+    )
+
+    return {
+        "success": True,
+        "id": a.id,
+        "driverName": a.driver_name,
+        "location": a.location,
+        "coords": state.custom_node_coords.get(a.location)
+    }
 
 
 @router.delete("/ambulances/{amb_id}")
@@ -275,4 +336,7 @@ def delete_ambulance(
         raise HTTPException(404, "Ambulance not found.")
     db.delete(a)
     db.commit()
+
+    # Sync in-memory ambulances
+    state.ambulances = [item for item in state.ambulances if item.id != amb_id]
     return {"success": True, "message": f"Ambulance #{amb_id} removed from fleet."}

@@ -44,9 +44,29 @@ export default function Dashboard({ user, onLogout }) {
   const [showAddUser, setShowAddUser] = useState(false);
   const [newUser, setNewUser] = useState({ fullName: "", email: "", password: "", role: "DRIVER", phone: "", ambulanceId: "" });
   const [showAddAmbulance, setShowAddAmbulance] = useState(false);
-  const [newAmbulance, setNewAmbulance] = useState({ id: "", driverName: "", location: "Gulshan", phone: "" });
+  const [newAmbulance, setNewAmbulance] = useState({
+    id: "",
+    driverName: "",
+    location: "Gulshan",
+    phone: "",
+    x: 420,
+    y: 140,
+    isCustomLocation: false,
+    customLocationName: "",
+    connectedTo: "Shahrah-e-Faisal",
+  });
   const [showAddHospital, setShowAddHospital] = useState(false);
-  const [newHospital, setNewHospital] = useState({ name: "", location: "Gulshan", totalBeds: 20, availableBeds: 15 });
+  const [newHospital, setNewHospital] = useState({
+    name: "",
+    location: "Gulshan",
+    totalBeds: 20,
+    availableBeds: 15,
+    x: 420,
+    y: 140,
+    isCustomLocation: false,
+    customLocationName: "",
+    connectedTo: "Shahrah-e-Faisal",
+  });
   const [editBedModal, setEditBedModal] = useState(null);
 
   // Dynamic Location & Road Creation Modals
@@ -218,11 +238,36 @@ export default function Dashboard({ user, onLogout }) {
   // Hospital Actions
   const handleCreateHospital = async (e) => {
     e.preventDefault();
+    const finalLocation = newHospital.isCustomLocation
+      ? newHospital.customLocationName.trim()
+      : newHospital.location.trim();
+    if (!finalLocation) {
+      showMsg("Please specify a valid sector location.", true);
+      return;
+    }
     try {
-      await createHospital(newHospital);
-      showMsg("Hospital added.");
+      await createHospital({
+        name: newHospital.name.trim(),
+        location: finalLocation,
+        totalBeds: parseInt(newHospital.totalBeds) || 0,
+        availableBeds: parseInt(newHospital.availableBeds) || 0,
+        x: parseInt(newHospital.x) || 420,
+        y: parseInt(newHospital.y) || 140,
+        connectedTo: newHospital.isCustomLocation ? (newHospital.connectedTo || "Shahrah-e-Faisal") : undefined,
+      });
+      showMsg("Hospital facility added successfully.");
       setShowAddHospital(false);
-      setNewHospital({ name: "", location: "Gulshan", totalBeds: 20, availableBeds: 15 });
+      setNewHospital({
+        name: "",
+        location: "Gulshan",
+        totalBeds: 20,
+        availableBeds: 15,
+        x: 420,
+        y: 140,
+        isCustomLocation: false,
+        customLocationName: "",
+        connectedTo: "Shahrah-e-Faisal",
+      });
       loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -248,11 +293,36 @@ export default function Dashboard({ user, onLogout }) {
   // Ambulance Actions
   const handleCreateAmbulance = async (e) => {
     e.preventDefault();
+    const finalLocation = newAmbulance.isCustomLocation
+      ? newAmbulance.customLocationName.trim()
+      : newAmbulance.location.trim();
+    if (!finalLocation) {
+      showMsg("Please specify a valid base location.", true);
+      return;
+    }
     try {
-      await createAmbulance({ ...newAmbulance, id: parseInt(newAmbulance.id) });
-      showMsg("Ambulance registered.");
+      await createAmbulance({
+        id: parseInt(newAmbulance.id),
+        driverName: newAmbulance.driverName.trim(),
+        location: finalLocation,
+        phone: newAmbulance.phone.trim(),
+        x: parseInt(newAmbulance.x) || 420,
+        y: parseInt(newAmbulance.y) || 140,
+        connectedTo: newAmbulance.isCustomLocation ? (newAmbulance.connectedTo || "Shahrah-e-Faisal") : undefined,
+      });
+      showMsg("Ambulance registered to fleet successfully.");
       setShowAddAmbulance(false);
-      setNewAmbulance({ id: "", driverName: "", location: "Gulshan", phone: "" });
+      setNewAmbulance({
+        id: "",
+        driverName: "",
+        location: "Gulshan",
+        phone: "",
+        x: 420,
+        y: 140,
+        isCustomLocation: false,
+        customLocationName: "",
+        connectedTo: "Shahrah-e-Faisal",
+      });
       loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -1326,13 +1396,33 @@ export default function Dashboard({ user, onLogout }) {
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Base Sector *</label>
                   <select
-                    value={newAmbulance.location}
-                    onChange={(e) => setNewAmbulance({ ...newAmbulance, location: e.target.value })}
+                    value={newAmbulance.isCustomLocation ? "__custom__" : newAmbulance.location}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__custom__") {
+                        setNewAmbulance({
+                          ...newAmbulance,
+                          isCustomLocation: true,
+                          x: 520,
+                          y: 220,
+                        });
+                      } else {
+                        const c = state?.coords?.[val] || { x: 420, y: 140 };
+                        setNewAmbulance({
+                          ...newAmbulance,
+                          location: val,
+                          isCustomLocation: false,
+                          x: c.x,
+                          y: c.y,
+                        });
+                      }
+                    }}
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
                   >
                     {zonesList.map((z) => (
                       <option key={z} value={z}>{z}</option>
                     ))}
+                    <option value="__custom__">+ Add Custom Sector / New Zone</option>
                   </select>
                 </div>
 
@@ -1345,6 +1435,75 @@ export default function Dashboard({ user, onLogout }) {
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
                   />
                 </div>
+
+                {newAmbulance.isCustomLocation && (
+                  <>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Custom Sector Name *</label>
+                      <input
+                        required
+                        placeholder="e.g. Bahria Town / Gulberg"
+                        value={newAmbulance.customLocationName}
+                        onChange={(e) => setNewAmbulance({ ...newAmbulance, customLocationName: e.target.value })}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Connect to Arterial Road</label>
+                      <select
+                        value={newAmbulance.connectedTo}
+                        onChange={(e) => setNewAmbulance({ ...newAmbulance, connectedTo: e.target.value })}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                      >
+                        {zonesList.map((z) => (
+                          <option key={z} value={z}>{z}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Map X Coordinate <span className="text-[10px] text-slate-400 font-normal">(50 - 800)</span>
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="50"
+                    max="800"
+                    placeholder="e.g. 420"
+                    value={newAmbulance.x}
+                    onChange={(e) => setNewAmbulance({ ...newAmbulance, x: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Map Y Coordinate <span className="text-[10px] text-slate-400 font-normal">(50 - 420)</span>
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="50"
+                    max="420"
+                    placeholder="e.g. 140"
+                    value={newAmbulance.y}
+                    onChange={(e) => setNewAmbulance({ ...newAmbulance, y: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                  Visual Map Radar Position:
+                </span>
+                <span className="font-mono font-semibold text-red-600 dark:text-red-400">
+                  X: {newAmbulance.x || 0}, Y: {newAmbulance.y || 0}
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
@@ -1405,15 +1564,62 @@ export default function Dashboard({ user, onLogout }) {
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Sector Location *</label>
                   <select
-                    value={newHospital.location}
-                    onChange={(e) => setNewHospital({ ...newHospital, location: e.target.value })}
+                    value={newHospital.isCustomLocation ? "__custom__" : newHospital.location}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__custom__") {
+                        setNewHospital({
+                          ...newHospital,
+                          isCustomLocation: true,
+                          x: 520,
+                          y: 220,
+                        });
+                      } else {
+                        const c = state?.coords?.[val] || { x: 420, y: 140 };
+                        setNewHospital({
+                          ...newHospital,
+                          location: val,
+                          isCustomLocation: false,
+                          x: c.x,
+                          y: c.y,
+                        });
+                      }
+                    }}
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
                   >
                     {zonesList.map((z) => (
                       <option key={z} value={z}>{z}</option>
                     ))}
+                    <option value="__custom__">+ Add Custom Sector / New Zone</option>
                   </select>
                 </div>
+
+                {newHospital.isCustomLocation && (
+                  <>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Custom Sector Name *</label>
+                      <input
+                        required
+                        placeholder="e.g. Clifton Block 4"
+                        value={newHospital.customLocationName}
+                        onChange={(e) => setNewHospital({ ...newHospital, customLocationName: e.target.value })}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Connect to Arterial Road</label>
+                      <select
+                        value={newHospital.connectedTo}
+                        onChange={(e) => setNewHospital({ ...newHospital, connectedTo: e.target.value })}
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                      >
+                        {zonesList.map((z) => (
+                          <option key={z} value={z}>{z}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Total Bed Capacity *</label>
@@ -1440,6 +1646,48 @@ export default function Dashboard({ user, onLogout }) {
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Map X Coordinate <span className="text-[10px] text-slate-400 font-normal">(50 - 800)</span>
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="50"
+                    max="800"
+                    placeholder="e.g. 420"
+                    value={newHospital.x}
+                    onChange={(e) => setNewHospital({ ...newHospital, x: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Map Y Coordinate <span className="text-[10px] text-slate-400 font-normal">(50 - 420)</span>
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="50"
+                    max="420"
+                    placeholder="e.g. 140"
+                    value={newHospital.y}
+                    onChange={(e) => setNewHospital({ ...newHospital, y: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-red-600 transition"
+                  />
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/50 flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-300">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                  Visual Map Radar Position:
+                </span>
+                <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                  X: {newHospital.x || 0}, Y: {newHospital.y || 0}
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">

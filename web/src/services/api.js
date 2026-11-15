@@ -209,6 +209,22 @@ export async function createHospital(payload) {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to add hospital");
+  }
+  return await res.json();
+}
+
+export async function deleteHospital(hospitalId) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/hospitals/${hospitalId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to delete hospital");
+  }
   return await res.json();
 }
 
@@ -221,6 +237,10 @@ export async function updateHospitalBeds(hospitalId, payload) {
       body: JSON.stringify(payload),
     }
   );
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to update beds");
+  }
   return await res.json();
 }
 
@@ -237,6 +257,22 @@ export async function createAmbulance(payload) {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to add ambulance");
+  }
+  return await res.json();
+}
+
+export async function deleteAmbulance(ambulanceId) {
+  const res = await fetch(`${API_BASE_URL}/api/admin/ambulances/${ambulanceId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to delete ambulance");
+  }
   return await res.json();
 }
 

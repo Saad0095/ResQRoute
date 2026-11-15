@@ -15,6 +15,7 @@ if backend_dir not in sys.path:
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
 
+import state
 from dsa.graph import CityGraph, build_default_city_map
 from dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
 from models import (
@@ -50,52 +51,9 @@ app.include_router(admin_router)
 
 # Initialize and seed database tables
 init_and_seed_db()
+state.sync_from_db()
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
-
-# In-Memory State
-graph: CityGraph = build_default_city_map()
-triage_queue: EmergencyPriorityQueue = EmergencyPriorityQueue()
-ambulances: List[AmbulanceModel] = []
-hospitals: List[HospitalModel] = []
-dispatch_history: List[Dict[str, Any]] = []
-
-custom_node_coords: Dict[str, Dict[str, int]] = {
-    "North Karachi": {"x": 180, "y": 70},
-    "Nazimabad": {"x": 150, "y": 190},
-    "Gulshan": {"x": 420, "y": 140},
-    "Saddar": {"x": 270, "y": 290},
-    "Airport": {"x": 670, "y": 170},
-    "Malir": {"x": 770, "y": 130},
-    "Shahrah-e-Faisal": {"x": 480, "y": 260},
-    "Clifton": {"x": 200, "y": 400},
-    "Defense": {"x": 490, "y": 390},
-}
-
-
-def init_default_records():
-    global ambulances, hospitals, triage_queue, dispatch_history, graph
-    graph = build_default_city_map()
-    ambulances = [
-        AmbulanceModel(id=101, driverName="Ali Khan", location="North Karachi", isAvailable=True, phone="+92 301 5550101", status="Available"),
-        AmbulanceModel(id=102, driverName="Ahmed Raza", location="Gulshan", isAvailable=True, phone="+92 302 5550102", status="Available"),
-        AmbulanceModel(id=103, driverName="Usman Sheikh", location="Nazimabad", isAvailable=True, phone="+92 303 5550103", status="Available"),
-        AmbulanceModel(id=104, driverName="Tariq Jameel", location="Saddar", isAvailable=True, phone="+92 304 5550104", status="Available"),
-        AmbulanceModel(id=105, driverName="Hamza Qureshi", location="Clifton", isAvailable=True, phone="+92 305 5550105", status="Available"),
-        AmbulanceModel(id=106, driverName="Kamran Akmal", location="Malir", isAvailable=True, phone="+92 306 5550106", status="Available"),
-    ]
-    hospitals = [
-        HospitalModel(id=201, name="City Hospital", location="Gulshan", totalBeds=15, availableBeds=12),
-        HospitalModel(id=202, name="Central Medical Complex", location="Nazimabad", totalBeds=10, availableBeds=5),
-        HospitalModel(id=203, name="South City Hospital", location="Clifton", totalBeds=20, availableBeds=8),
-        HospitalModel(id=204, name="Civil Trauma Center", location="Saddar", totalBeds=25, availableBeds=14),
-        HospitalModel(id=205, name="JPMC Emergency Care", location="Shahrah-e-Faisal", totalBeds=30, availableBeds=18),
-    ]
-    triage_queue = EmergencyPriorityQueue()
-    dispatch_history = []
-
-
-init_default_records()
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -115,8 +73,8 @@ def serve_dashboard_explicit():
 @app.get("/api/locations")
 def get_locations():
     return {
-        "locations": graph.get_nodes(),
-        "coords": custom_node_coords
+        "locations": state.graph.get_nodes(),
+        "coords": state.custom_node_coords
     }
 
 
@@ -127,45 +85,26 @@ def add_location(req: AddLocationRequest):
     if not name:
         raise HTTPException(400, "Location name cannot be empty.")
     
-    graph.add_node(name)
-
-    # Assign coordinates for canvas visualization
-    if req.x is not None and req.y is not None:
-        custom_node_coords[name] = {"x": int(req.x), "y": int(req.y)}
-    elif req.connectedTo and req.connectedTo in custom_node_coords:
-        base = custom_node_coords[req.connectedTo]
-        # Offset slightly from the connected neighbor within canvas bounds
-        custom_node_coords[name] = {
-            "x": min(810, max(50, base["x"] + 65)),
-            "y": min(410, max(50, base["y"] + 35))
-        }
-    else:
-        # Default layout slot based on node index
-        idx = len(graph.get_nodes())
-        custom_node_coords[name] = {
-            "x": 100 + (idx * 65) % 650,
-            "y": 120 + (idx * 45) % 300
-        }
-
-    # Optionally connect to an existing zone immediately
-    if req.connectedTo:
-        conn = req.connectedTo.strip()
-        if conn and conn in graph.get_nodes():
-            dist = float(req.distanceKm if req.distanceKm and req.distanceKm > 0 else 5.0)
-            graph.add_road(name, conn, dist)
+    state.register_node_and_coords(
+        name,
+        x=req.x,
+        y=req.y,
+        connected_to=req.connectedTo,
+        distance_km=float(req.distanceKm if req.distanceKm and req.distanceKm > 0 else 5.0)
+    )
 
     return {
         "success": True,
         "name": name,
-        "locations": graph.get_nodes(),
-        "roads": graph.get_roads(),
-        "coords": custom_node_coords
+        "locations": state.graph.get_nodes(),
+        "roads": state.graph.get_roads(),
+        "coords": state.custom_node_coords
     }
 
 
 @app.get("/api/roads")
 def get_roads():
-    return {"roads": graph.get_roads()}
+    return {"roads": state.graph.get_roads()}
 
 
 @app.post("/api/roads")
@@ -181,13 +120,13 @@ def add_road(req: AddRoadRequest):
     if weight <= 0:
         raise HTTPException(400, "Distance must be greater than 0 km.")
     
-    graph.add_road(u, v, weight)
+    state.graph.add_road(u, v, weight)
     return {
         "success": True,
         "u": u,
         "v": v,
         "weight": weight,
-        "roads": graph.get_roads()
+        "roads": state.graph.get_roads()
     }
 
 
@@ -199,12 +138,12 @@ def plan_route(start: str, destination: str):
     """
     start = start.strip()
     destination = destination.strip()
-    if start not in graph.get_nodes():
+    if start not in state.graph.get_nodes():
         raise HTTPException(404, f"Start location '{start}' not found in city graph.")
-    if destination not in graph.get_nodes():
+    if destination not in state.graph.get_nodes():
         raise HTTPException(404, f"Destination '{destination}' not found in city graph.")
 
-    path, dist = graph.get_shortest_path(start, destination)
+    path, dist = state.graph.get_shortest_path(start, destination)
     if not path or dist == float("inf"):
         return {
             "success": False,
@@ -230,7 +169,7 @@ def plan_route(start: str, destination: str):
 @app.post("/api/road/toggle")
 def toggle_road(req: RoadToggleRequest):
     """Dynamically close or reopen a road segment to test rerouting."""
-    is_closed = graph.toggle_road(req.u, req.v)
+    is_closed = state.graph.toggle_road(req.u, req.v)
     return {
         "success": True,
         "u": req.u,
@@ -243,14 +182,14 @@ def toggle_road(req: RoadToggleRequest):
 @app.get("/api/status")
 def get_system_status():
     return {
-        "ambulances": [a.dict() for a in ambulances],
-        "hospitals": [h.dict() for h in hospitals],
-        "pendingEmergencies": triage_queue.to_list(),
-        "recentDispatches": dispatch_history[-10:],
-        "availableZones": graph.get_nodes(),
-        "coords": custom_node_coords,
-        "roads": graph.get_roads(),
-        "closedRoads": [list(k) for k in graph.closed_roads]
+        "ambulances": [a.dict() for a in state.ambulances],
+        "hospitals": [h.dict() for h in state.hospitals],
+        "pendingEmergencies": state.triage_queue.to_list(),
+        "recentDispatches": state.dispatch_history[-10:],
+        "availableZones": state.graph.get_nodes(),
+        "coords": state.custom_node_coords,
+        "roads": state.graph.get_roads(),
+        "closedRoads": [list(k) for k in state.graph.closed_roads]
     }
 
 
@@ -266,7 +205,7 @@ def trigger_sos(request: SOSRequest):
     6. Return complete dispatch decision with route steps & ETA.
     """
     patient_loc = request.location
-    if patient_loc not in graph.get_nodes():
+    if patient_loc not in state.graph.get_nodes():
         patient_loc = "Gulshan"
 
     emergency_id = f"EMG-{uuid.uuid4().hex[:6].upper()}"
@@ -277,24 +216,24 @@ def trigger_sos(request: SOSRequest):
         severity=request.severity,
         description=request.notes or ""
     )
-    triage_queue.push(triage_item)
+    state.triage_queue.push(triage_item)
 
     # Pop highest priority call to process
-    current_call = triage_queue.pop()
+    current_call = state.triage_queue.pop()
     severity_labels = {1: "Low", 2: "Medium", 3: "High", 4: "Critical"}
     sev_label = severity_labels.get(current_call.severity, "Critical")
 
     # 1. Dijkstra from patient location to evaluate all reachable node distances
-    distances_from_patient, _ = graph.dijkstra(patient_loc)
+    distances_from_patient, _ = state.graph.dijkstra(patient_loc)
 
     # 2. Find closest available ambulance using shortest path distances
     best_ambulance: Optional[AmbulanceModel] = None
     best_amb_dist = float("inf")
     best_amb_path: List[str] = []
 
-    for amb in ambulances:
+    for amb in state.ambulances:
         if amb.isAvailable and amb.location in distances_from_patient:
-            path, dist = graph.get_shortest_path(amb.location, patient_loc)
+            path, dist = state.graph.get_shortest_path(amb.location, patient_loc)
             if dist < best_amb_dist:
                 best_amb_dist = dist
                 best_ambulance = amb
@@ -302,7 +241,7 @@ def trigger_sos(request: SOSRequest):
 
     if not best_ambulance or best_amb_dist == float("inf"):
         # Re-queue the emergency since no ambulance is reachable/free right now
-        triage_queue.push(current_call)
+        state.triage_queue.push(current_call)
         return DispatchResponse(
             success=False,
             message="No available ambulance can reach this location (All units busy or roads blocked)! Queued.",
@@ -316,11 +255,11 @@ def trigger_sos(request: SOSRequest):
     best_hosp_dist = float("inf")
     best_hosp_path: List[str] = []
 
-    for hosp in hospitals:
+    for hosp in state.hospitals:
         if hosp.availableBeds > 0 and hosp.location in distances_from_patient:
             dist_to_hosp = distances_from_patient[hosp.location]
             if dist_to_hosp < best_hosp_dist:
-                path, dist = graph.get_shortest_path(patient_loc, hosp.location)
+                path, dist = state.graph.get_shortest_path(patient_loc, hosp.location)
                 if dist != float("inf"):
                     best_hosp_dist = dist
                     best_hospital = hosp
@@ -377,7 +316,7 @@ def trigger_sos(request: SOSRequest):
         totalEtaMinutes=total_eta
     )
 
-    dispatch_history.append(result.dict())
+    state.dispatch_history.append(result.dict())
 
     # Persist incident to database
     try:
@@ -407,7 +346,7 @@ def trigger_sos(request: SOSRequest):
 
 @app.get("/api/ambulance/{amb_id}/mission")
 def get_ambulance_mission(amb_id: int):
-    for amb in ambulances:
+    for amb in state.ambulances:
         if amb.id == amb_id:
             return {
                 "ambulanceId": amb.id,
@@ -422,7 +361,7 @@ def get_ambulance_mission(amb_id: int):
 
 @app.post("/api/ambulance/{amb_id}/status")
 def update_ambulance_status(amb_id: int, req: DriverStatusUpdate):
-    for amb in ambulances:
+    for amb in state.ambulances:
         if amb.id == amb_id:
             amb.status = req.status
             mission_id = amb.currentMission.get("emergencyId") if amb.currentMission else None
@@ -464,7 +403,8 @@ def update_ambulance_status(amb_id: int, req: DriverStatusUpdate):
 
 @app.post("/api/reset")
 def reset_system():
-    init_default_records()
+    state.init_default_records()
+    return {"success": True, "message": "System reset to default state. All ambulances available and beds restored."}
     return {"success": True, "message": "System reset to default state. All ambulances available and beds restored."}
 
 

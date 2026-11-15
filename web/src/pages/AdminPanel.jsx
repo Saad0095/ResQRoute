@@ -81,6 +81,8 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
     location: "Gulshan",
     totalBeds: 15,
     availableBeds: 12,
+    x: 420,
+    y: 140,
   });
 
   const [showCreateAmbulance, setShowCreateAmbulance] = useState(false);
@@ -89,6 +91,8 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
     driverName: "",
     location: "Gulshan",
     phone: "",
+    x: 420,
+    y: 140,
   });
 
   const showMsg = (msg, isError = false) => {
@@ -165,10 +169,17 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
   const handleCreateHospital = async (e) => {
     e.preventDefault();
     try {
-      await createHospital(newHospital);
+      await createHospital({
+        name: newHospital.name.trim(),
+        location: newHospital.location.trim(),
+        totalBeds: parseInt(newHospital.totalBeds) || 0,
+        availableBeds: parseInt(newHospital.availableBeds) || 0,
+        x: parseInt(newHospital.x) || 420,
+        y: parseInt(newHospital.y) || 140,
+      });
       showMsg("Hospital added.");
       setShowCreateHospital(false);
-      setNewHospital({ name: "", location: "Gulshan", totalBeds: 15, availableBeds: 12 });
+      setNewHospital({ name: "", location: "Gulshan", totalBeds: 15, availableBeds: 12, x: 420, y: 140 });
       loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -191,12 +202,16 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
     e.preventDefault();
     try {
       await createAmbulance({
-        ...newAmbulance,
         id: parseInt(newAmbulance.id),
+        driverName: newAmbulance.driverName.trim(),
+        location: newAmbulance.location.trim(),
+        phone: newAmbulance.phone.trim(),
+        x: parseInt(newAmbulance.x) || 420,
+        y: parseInt(newAmbulance.y) || 140,
       });
       showMsg("Ambulance registered.");
       setShowCreateAmbulance(false);
-      setNewAmbulance({ id: "", driverName: "", location: "Gulshan", phone: "" });
+      setNewAmbulance({ id: "", driverName: "", location: "Gulshan", phone: "", x: 420, y: 140 });
       loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -557,7 +572,7 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
               {showCreateAmbulance && (
                 <form onSubmit={handleCreateAmbulance} className="mb-5 p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
                   <h3 className="text-xs font-bold text-gray-900 dark:text-white mb-3">Register New Vehicle</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
                     <input
                       required
                       type="number"
@@ -584,6 +599,24 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
                       placeholder="Phone"
                       value={newAmbulance.phone}
                       onChange={(e) => setNewAmbulance({ ...newAmbulance, phone: e.target.value })}
+                      className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="number"
+                      min="50"
+                      max="800"
+                      placeholder="Map X (50-800)"
+                      value={newAmbulance.x}
+                      onChange={(e) => setNewAmbulance({ ...newAmbulance, x: parseInt(e.target.value) || 0 })}
+                      className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                    />
+                    <input
+                      type="number"
+                      min="50"
+                      max="420"
+                      placeholder="Map Y (50-420)"
+                      value={newAmbulance.y}
+                      onChange={(e) => setNewAmbulance({ ...newAmbulance, y: parseInt(e.target.value) || 0 })}
                       className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                     />
                   </div>
@@ -637,7 +670,7 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
               {showCreateHospital && (
                 <form onSubmit={handleCreateHospital} className="mb-5 p-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-sm">
                   <h3 className="text-xs font-bold text-gray-900 dark:text-white mb-3">Add New Hospital</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
                     <input
                       required
                       placeholder="Hospital Name"
@@ -666,6 +699,24 @@ export default function AdminPanel({ user, onLogout, onSwitchView }) {
                       placeholder="Available Beds"
                       value={newHospital.availableBeds}
                       onChange={(e) => setNewHospital({ ...newHospital, availableBeds: parseInt(e.target.value) || 0 })}
+                      className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
+                    />
+                    <input
+                      type="number"
+                      min="50"
+                      max="800"
+                      placeholder="Map X (50-800)"
+                      value={newHospital.x}
+                      onChange={(e) => setNewHospital({ ...newHospital, x: parseInt(e.target.value) || 0 })}
+                      className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
+                    />
+                    <input
+                      type="number"
+                      min="50"
+                      max="420"
+                      placeholder="Map Y (50-420)"
+                      value={newHospital.y}
+                      onChange={(e) => setNewHospital({ ...newHospital, y: parseInt(e.target.value) || 0 })}
                       className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-emerald-500"
                     />
                   </div>
