@@ -19,8 +19,19 @@ custom_node_coords: Dict[str, Dict[str, int]] = {
     "Clifton":          {"x": 200, "y": 400},
     "Defense":          {"x": 490, "y": 390},
     "Gulistan-e-Jauhar":{"x": 440, "y": 70},
-    "Gulistan-e-Johar": {"x": 440, "y": 70},
 }
+
+
+def canonicalize_node_name(name: str) -> str:
+    cleaned = name.strip()
+    norm = cleaned.lower().replace(" ", "").replace("-", "")
+    if norm in ("gulistanejauhar", "gulistanejohar", "gulistanjauhar", "gulistanjohar", "jauhar", "johar"):
+        return "Gulistan-e-Jauhar"
+    if norm in ("northkarachi", "north-karachi"):
+        return "North Karachi"
+    if norm in ("shahrahefaisal", "shahrah-e-faisal"):
+        return "Shahrah-e-Faisal"
+    return cleaned
 
 graph: CityGraph = build_default_city_map()
 triage_queue: EmergencyPriorityQueue = EmergencyPriorityQueue()
@@ -99,14 +110,19 @@ def register_node_and_coords(
     Guarantees a city location is registered on the graph with valid canvas coordinates.
     Connects it to an existing arterial node if it's new so Dijkstra routing works immediately.
     """
-    clean_loc = location.strip()
+    clean_loc = canonicalize_node_name(location)
     if not clean_loc:
         return
+
+    # Clean legacy duplicate aliases
+    for alias in ["Gulistan-e-Johar", "Gulistan e Jauhar", "Gulistan e Johar", "Gulistane Jauhar"]:
+        if alias != clean_loc and alias in custom_node_coords:
+            del custom_node_coords[alias]
 
     # 1. Add to graph if new
     if clean_loc not in graph.get_nodes():
         graph.add_node(clean_loc)
-        target = connected_to if (connected_to and connected_to in graph.get_nodes()) else "Shahrah-e-Faisal"
+        target = canonicalize_node_name(connected_to) if (connected_to and connected_to in graph.get_nodes()) else "Gulshan"
         if target in graph.get_nodes() and target != clean_loc:
             graph.add_road(clean_loc, target, float(distance_km))
         elif graph.get_nodes():
@@ -158,8 +174,13 @@ def update_location_record(
     y: Optional[int] = None,
 ) -> Dict[str, Any]:
     global custom_node_coords, ambulances, hospitals
-    clean_old = old_name.strip()
-    clean_new = new_name.strip() if new_name else clean_old
+    clean_old = canonicalize_node_name(old_name)
+    clean_new = canonicalize_node_name(new_name) if new_name else clean_old
+
+    # Clean legacy duplicate aliases
+    for alias in ["Gulistan-e-Johar", "Gulistan e Jauhar", "Gulistan e Johar", "Gulistane Jauhar"]:
+        if alias != clean_new and alias in custom_node_coords:
+            del custom_node_coords[alias]
 
     if x is not None and y is not None:
         custom_node_coords[clean_new] = {"x": int(x), "y": int(y)}

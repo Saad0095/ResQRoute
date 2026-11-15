@@ -464,23 +464,51 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  // Dynamic sectors list from backend graph and coordinate registry (includes Gulistan-e-Jauhar)
-  const zonesList = Array.from(
-    new Set([
-      ...(state?.availableZones || []),
-      ...Object.keys(state?.coords || {}),
-      "Gulshan",
-      "Nazimabad",
-      "North Karachi",
-      "Saddar",
-      "Clifton",
-      "Defense",
-      "Airport",
-      "Malir",
-      "Shahrah-e-Faisal",
-      "Gulistan-e-Jauhar",
-    ])
-  ).sort();
+  // Dynamic sectors list from backend graph and coordinate registry (canonicalized and deduplicated)
+  const canonicalizeZone = (zone) => {
+    if (!zone) return "";
+    const norm = zone.toLowerCase().replace(/[\s-]/g, "");
+    if (
+      norm === "gulistanejauhar" ||
+      norm === "gulistanejohar" ||
+      norm === "gulistanjauhar" ||
+      norm === "gulistanjohar" ||
+      norm === "jauhar" ||
+      norm === "johar"
+    ) {
+      return "Gulistan-e-Jauhar";
+    }
+    if (norm === "northkarachi") return "North Karachi";
+    if (norm === "shahrahefaisal") return "Shahrah-e-Faisal";
+    return zone.trim();
+  };
+
+  const rawZonesList = [
+    ...(state?.availableZones || []),
+    ...Object.keys(state?.coords || {}),
+    "Gulshan",
+    "Nazimabad",
+    "North Karachi",
+    "Saddar",
+    "Clifton",
+    "Defense",
+    "Airport",
+    "Malir",
+    "Shahrah-e-Faisal",
+    "Gulistan-e-Jauhar",
+  ];
+
+  const seenZoneNorm = new Set();
+  const zonesList = [];
+  for (const raw of rawZonesList) {
+    const canon = canonicalizeZone(raw);
+    const norm = canon.toLowerCase().replace(/[\s-]/g, "");
+    if (norm && !seenZoneNorm.has(norm)) {
+      seenZoneNorm.add(norm);
+      zonesList.push(canon);
+    }
+  }
+  zonesList.sort();
 
   // Metrics
   const ambulancesReady = state?.ambulances?.filter((a) => a.isAvailable).length || 0;
@@ -1988,7 +2016,7 @@ export default function Dashboard({ user, onLogout }) {
       {/* 5. ADD LOCATION / SECTOR MODAL */}
       {showAddLocation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-sm">
@@ -2008,6 +2036,123 @@ export default function Dashboard({ user, onLogout }) {
             </div>
 
             <form onSubmit={handleCreateLocation} className="p-6 space-y-4 text-xs">
+              {/* Visual Interactive Map Preview */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-sky-600 dark:text-sky-400 flex items-center gap-1.5">
+                    <span>🗺️</span> Live Visual Placement Preview
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    Click or drag on map to position
+                  </span>
+                </div>
+                <div
+                  className="relative w-full h-44 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden cursor-crosshair select-none shadow-inner"
+                  onMouseDown={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.round(Math.max(50, Math.min(800, ((e.clientX - rect.left) / rect.width) * 860)));
+                    const y = Math.round(Math.max(50, Math.min(420, ((e.clientY - rect.top) / rect.height) * 460)));
+                    setNewLocation((prev) => ({ ...prev, x, y, direction: "custom" }));
+                  }}
+                  onMouseMove={(e) => {
+                    if (e.buttons === 1) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.round(Math.max(50, Math.min(800, ((e.clientX - rect.left) / rect.width) * 860)));
+                      const y = Math.round(Math.max(50, Math.min(420, ((e.clientY - rect.top) / rect.height) * 460)));
+                      setNewLocation((prev) => ({ ...prev, x, y, direction: "custom" }));
+                    }
+                  }}
+                >
+                  <svg viewBox="0 0 860 460" className="w-full h-full pointer-events-none">
+                    <defs>
+                      <pattern id="grid-add" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.8" />
+                      </pattern>
+                    </defs>
+                    <rect width="860" height="460" fill="url(#grid-add)" />
+
+                    {/* Existing Roads */}
+                    {(state?.roads || []).map((r, i) => {
+                      const p1 = state?.coords?.[r.u] || { x: 420, y: 140 };
+                      const p2 = state?.coords?.[r.v] || { x: 420, y: 140 };
+                      return (
+                        <line
+                          key={i}
+                          x1={p1.x}
+                          y1={p1.y}
+                          x2={p2.x}
+                          y2={p2.y}
+                          stroke="#334155"
+                          strokeWidth="1.5"
+                          opacity={0.35}
+                        />
+                      );
+                    })}
+
+                    {/* Road connection to parent sector */}
+                    {newLocation.connectedTo && (
+                      <line
+                        x1={newLocation.x}
+                        y1={newLocation.y}
+                        x2={(state?.coords?.[newLocation.connectedTo] || { x: 420, y: 140 }).x}
+                        y2={(state?.coords?.[newLocation.connectedTo] || { x: 420, y: 140 }).y}
+                        stroke="#38bdf8"
+                        strokeWidth="2.5"
+                        strokeDasharray="5 4"
+                      />
+                    )}
+
+                    {/* Other City Sector Nodes */}
+                    {zonesList.map((z) => {
+                      const c = state?.coords?.[z] || { x: 420, y: 140 };
+                      const isConnected = z === newLocation.connectedTo;
+                      return (
+                        <g key={z}>
+                          <circle
+                            cx={c.x}
+                            cy={c.y}
+                            r={isConnected ? 9 : 6}
+                            fill={isConnected ? "#0284c7" : "#1e293b"}
+                            stroke={isConnected ? "#38bdf8" : "#64748b"}
+                            strokeWidth={isConnected ? 2 : 1.5}
+                          />
+                          <text
+                            x={c.x}
+                            y={c.y + 15}
+                            fill={isConnected ? "#38bdf8" : "#94a3b8"}
+                            fontSize="10"
+                            textAnchor="middle"
+                            fontWeight={isConnected ? "bold" : "normal"}
+                          >
+                            {z}
+                          </text>
+                        </g>
+                      );
+                    })}
+
+                    {/* New Sector Pin */}
+                    <g>
+                      <circle cx={newLocation.x} cy={newLocation.y} r="18" fill="#0284c7" fillOpacity="0.3" className="animate-ping" />
+                      <circle cx={newLocation.x} cy={newLocation.y} r="12" fill="#0284c7" stroke="#ffffff" strokeWidth="2.5" />
+                      <circle cx={newLocation.x} cy={newLocation.y} r="4" fill="#ffffff" />
+                      <text
+                        x={newLocation.x}
+                        y={newLocation.y - 16}
+                        fill="#38bdf8"
+                        fontSize="11"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                      >
+                        {newLocation.name || "New Sector"}
+                      </text>
+                    </g>
+                  </svg>
+                  <div className="absolute bottom-2 right-2 bg-slate-900/90 border border-slate-700/80 px-2 py-0.5 rounded text-[10px] font-mono text-sky-400">
+                    X: {newLocation.x} | Y: {newLocation.y}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Sector Name *</label>
@@ -2177,14 +2322,14 @@ export default function Dashboard({ user, onLogout }) {
       {/* 6. ADD / CONNECT ROAD MODAL */}
       {showAddRoad && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
                   🛣️
                 </div>
                 <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:white">Connect Two City Sectors</h3>
+                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">Connect Two City Sectors</h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">Create or update a bidirectional road artery</p>
                 </div>
               </div>
@@ -2197,6 +2342,128 @@ export default function Dashboard({ user, onLogout }) {
             </div>
 
             <form onSubmit={handleCreateRoad} className="p-6 space-y-4 text-xs">
+              {/* Visual Road Connection Preview */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span>🛣️</span> Live Road Connection Preview
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    Click any node to select endpoint
+                  </span>
+                </div>
+                <div className="relative w-full h-44 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden select-none shadow-inner">
+                  <svg viewBox="0 0 860 460" className="w-full h-full">
+                    <defs>
+                      <pattern id="grid-road" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.8" />
+                      </pattern>
+                    </defs>
+                    <rect width="860" height="460" fill="url(#grid-road)" />
+
+                    {/* Existing Roads */}
+                    {(state?.roads || []).map((r, i) => {
+                      const p1 = state?.coords?.[r.u] || { x: 420, y: 140 };
+                      const p2 = state?.coords?.[r.v] || { x: 420, y: 140 };
+                      return (
+                        <line
+                          key={i}
+                          x1={p1.x}
+                          y1={p1.y}
+                          x2={p2.x}
+                          y2={p2.y}
+                          stroke="#334155"
+                          strokeWidth="1.5"
+                          opacity={0.35}
+                        />
+                      );
+                    })}
+
+                    {/* Proposed New Road Between u and v */}
+                    {newRoad.u && newRoad.v && newRoad.u !== newRoad.v && (() => {
+                      const p1 = state?.coords?.[newRoad.u] || { x: 420, y: 140 };
+                      const p2 = state?.coords?.[newRoad.v] || { x: 420, y: 140 };
+                      const midX = (p1.x + p2.x) / 2;
+                      const midY = (p1.y + p2.y) / 2;
+                      return (
+                        <g>
+                          <line
+                            x1={p1.x}
+                            y1={p1.y}
+                            x2={p2.x}
+                            y2={p2.y}
+                            stroke="#10b981"
+                            strokeWidth="3.5"
+                            strokeDasharray="6 4"
+                          />
+                          <rect
+                            x={midX - 35}
+                            y={midY - 12}
+                            width="70"
+                            height="20"
+                            rx="10"
+                            fill="#064e3b"
+                            stroke="#10b981"
+                            strokeWidth="1.5"
+                          />
+                          <text
+                            x={midX}
+                            y={midY + 2}
+                            fill="#a7f3d0"
+                            fontSize="10"
+                            fontWeight="bold"
+                            textAnchor="middle"
+                          >
+                            {newRoad.weight} km
+                          </text>
+                        </g>
+                      );
+                    })()}
+
+                    {/* City Sector Nodes (Clickable) */}
+                    {zonesList.map((z) => {
+                      const c = state?.coords?.[z] || { x: 420, y: 140 };
+                      const isU = z === newRoad.u;
+                      const isV = z === newRoad.v;
+                      const isSelected = isU || isV;
+                      return (
+                        <g
+                          key={z}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            if (!isU && !isV) {
+                              setNewRoad((prev) => ({ ...prev, v: z }));
+                            }
+                          }}
+                        >
+                          {isSelected && (
+                            <circle cx={c.x} cy={c.y} r="16" fill="#10b981" fillOpacity="0.3" className="animate-ping" />
+                          )}
+                          <circle
+                            cx={c.x}
+                            cy={c.y}
+                            r={isSelected ? 10 : 6}
+                            fill={isSelected ? "#10b981" : "#1e293b"}
+                            stroke={isSelected ? "#ffffff" : "#64748b"}
+                            strokeWidth={isSelected ? 2.5 : 1.5}
+                          />
+                          <text
+                            x={c.x}
+                            y={c.y + 16}
+                            fill={isSelected ? "#6ee7b7" : "#94a3b8"}
+                            fontSize="10"
+                            textAnchor="middle"
+                            fontWeight={isSelected ? "bold" : "normal"}
+                          >
+                            {z}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">First Sector *</label>
@@ -2261,7 +2528,7 @@ export default function Dashboard({ user, onLogout }) {
       {/* 7. EDIT SECTOR / LOCATION MODAL */}
       {showEditLocation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
@@ -2269,7 +2536,7 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 dark:text-white">Edit Sector / Location</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Update map coordinates or rename sector</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Click & drag on map to adjust coordinates visually</p>
                 </div>
               </div>
               <button
@@ -2281,6 +2548,110 @@ export default function Dashboard({ user, onLogout }) {
             </div>
 
             <form onSubmit={handleUpdateLocation} className="p-6 space-y-4 text-xs">
+              {/* Visual Interactive Map Preview with Drag and Click to Adjust */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                    <span>🎯</span> Live Visual Positioning
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    Click or drag marker on map to adjust position
+                  </span>
+                </div>
+                <div
+                  className="relative w-full h-48 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden cursor-crosshair select-none shadow-inner"
+                  onMouseDown={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.round(Math.max(50, Math.min(800, ((e.clientX - rect.left) / rect.width) * 860)));
+                    const y = Math.round(Math.max(50, Math.min(420, ((e.clientY - rect.top) / rect.height) * 460)));
+                    setEditLocation((prev) => ({ ...prev, x, y }));
+                  }}
+                  onMouseMove={(e) => {
+                    if (e.buttons === 1) {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.round(Math.max(50, Math.min(800, ((e.clientX - rect.left) / rect.width) * 860)));
+                      const y = Math.round(Math.max(50, Math.min(420, ((e.clientY - rect.top) / rect.height) * 460)));
+                      setEditLocation((prev) => ({ ...prev, x, y }));
+                    }
+                  }}
+                >
+                  <svg viewBox="0 0 860 460" className="w-full h-full pointer-events-none">
+                    <defs>
+                      <pattern id="grid-edit" width="40" height="40" patternUnits="userSpaceOnUse">
+                        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" strokeWidth="0.8" />
+                      </pattern>
+                    </defs>
+                    <rect width="860" height="460" fill="url(#grid-edit)" />
+
+                    {/* Existing Roads with Dynamic Connected Line Stretch */}
+                    {(state?.roads || []).map((r, i) => {
+                      const uCoord = r.u === editLocation.selected ? { x: editLocation.x, y: editLocation.y } : (state?.coords?.[r.u] || { x: 420, y: 140 });
+                      const vCoord = r.v === editLocation.selected ? { x: editLocation.x, y: editLocation.y } : (state?.coords?.[r.v] || { x: 420, y: 140 });
+                      const isConnected = r.u === editLocation.selected || r.v === editLocation.selected;
+                      return (
+                        <line
+                          key={i}
+                          x1={uCoord.x}
+                          y1={uCoord.y}
+                          x2={vCoord.x}
+                          y2={vCoord.y}
+                          stroke={isConnected ? "#818cf8" : "#334155"}
+                          strokeWidth={isConnected ? 2.5 : 1.5}
+                          strokeDasharray={isConnected ? "5 4" : "none"}
+                          opacity={isConnected ? 0.95 : 0.35}
+                        />
+                      );
+                    })}
+
+                    {/* Other City Sector Nodes */}
+                    {zonesList
+                      .filter((z) => z !== editLocation.selected)
+                      .map((z) => {
+                        const c = state?.coords?.[z] || { x: 420, y: 140 };
+                        return (
+                          <g key={z}>
+                            <circle cx={c.x} cy={c.y} r="7" fill="#1e293b" stroke="#64748b" strokeWidth="1.5" />
+                            <text x={c.x} y={c.y + 15} fill="#94a3b8" fontSize="10" textAnchor="middle">
+                              {z}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                    {/* Target Sector Pin Being Edited (Glowing & Interactive) */}
+                    <g>
+                      <circle cx={editLocation.x} cy={editLocation.y} r="20" fill="#6366f1" fillOpacity="0.25" className="animate-ping" />
+                      <circle cx={editLocation.x} cy={editLocation.y} r="13" fill="#4f46e5" stroke="#ffffff" strokeWidth="2.5" />
+                      <circle cx={editLocation.x} cy={editLocation.y} r="4" fill="#ffffff" />
+                      <rect
+                        x={editLocation.x - 55}
+                        y={editLocation.y - 30}
+                        width="110"
+                        height="18"
+                        rx="9"
+                        fill="#312e81"
+                        stroke="#818cf8"
+                        strokeWidth="1"
+                      />
+                      <text
+                        x={editLocation.x}
+                        y={editLocation.y - 18}
+                        fill="#ffffff"
+                        fontSize="10"
+                        fontWeight="bold"
+                        textAnchor="middle"
+                      >
+                        {editLocation.newName || editLocation.selected}
+                      </text>
+                    </g>
+                  </svg>
+
+                  <div className="absolute bottom-2 right-2 bg-slate-900/90 border border-slate-700/80 px-2 py-0.5 rounded text-[10px] font-mono text-indigo-300">
+                    X: {editLocation.x} | Y: {editLocation.y}
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Select Sector to Edit *</label>

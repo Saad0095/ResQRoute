@@ -1,6 +1,24 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useTheme } from "../context/ThemeContext";
 
+export const canonicalizeZone = (zone) => {
+  if (!zone) return "";
+  const norm = zone.toLowerCase().replace(/[\s-]/g, "");
+  if (
+    norm === "gulistanejauhar" ||
+    norm === "gulistanejohar" ||
+    norm === "gulistanjauhar" ||
+    norm === "gulistanjohar" ||
+    norm === "jauhar" ||
+    norm === "johar"
+  ) {
+    return "Gulistan-e-Jauhar";
+  }
+  if (norm === "northkarachi") return "North Karachi";
+  if (norm === "shahrahefaisal") return "Shahrah-e-Faisal";
+  return zone.trim();
+};
+
 const defaultNodeCoords = {
   "North Karachi":    { x: 180, y: 70 },
   "Nazimabad":        { x: 150, y: 190 },
@@ -12,7 +30,6 @@ const defaultNodeCoords = {
   "Clifton":          { x: 200, y: 400 },
   "Defense":          { x: 490, y: 390 },
   "Gulistan-e-Jauhar":{ x: 440, y: 70 },
-  "Gulistan-e-Johar": { x: 440, y: 70 },
 };
 
 export default function CityMap({ state, activeRoute, activeDispatch, onClearRoute }) {
@@ -32,10 +49,15 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
     const ctx = canvas.getContext("2d");
 
     const coordsMap = { ...defaultNodeCoords, ...(state?.coords || {}) };
+    delete coordsMap["Gulistan-e-Johar"];
+    delete coordsMap["Gulistan e Jauhar"];
+    delete coordsMap["Gulistan e Johar"];
 
-    const getCoord = (zone) => {
-      if (!zone) return { x: 430, y: 230 };
+    const getCoord = (rawZone) => {
+      if (!rawZone) return { x: 430, y: 230 };
+      const zone = canonicalizeZone(rawZone);
       if (coordsMap[zone]) return coordsMap[zone];
+      if (coordsMap[rawZone]) return coordsMap[rawZone];
       let hash = 0;
       for (let i = 0; i < zone.length; i++) {
         hash = (hash << 5) - hash + zone.charCodeAt(i);
@@ -180,14 +202,23 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
         }
       }
 
-      // 3. Draw City Sector Nodes
-      const allZones = Array.from(
-        new Set([
-          ...(state.availableZones || []),
-          ...state.roads.flatMap((r) => [r.u, r.v]),
-          ...Object.keys(coordsMap),
-        ])
-      );
+      // 3. Draw City Sector Nodes - Deduplicated by canonical name
+      const rawZones = [
+        ...(state.availableZones || []),
+        ...state.roads.flatMap((r) => [r.u, r.v]),
+        ...Object.keys(coordsMap),
+      ];
+
+      const seenNorm = new Set();
+      const allZones = [];
+      for (const raw of rawZones) {
+        const canon = canonicalizeZone(raw);
+        const normKey = canon.toLowerCase().replace(/[\s-]/g, "");
+        if (normKey && !seenNorm.has(normKey)) {
+          seenNorm.add(normKey);
+          allZones.push(canon);
+        }
+      }
 
       allZones.forEach((zone) => {
         const { x, y } = getCoord(zone);
