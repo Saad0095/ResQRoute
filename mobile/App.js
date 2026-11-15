@@ -49,6 +49,7 @@ export default function App() {
     "Malir",
     "Shahrah-e-Faisal",
   ]);
+  const [locationCoords, setLocationCoords] = useState({});
   const [severity, setSeverity] = useState(4); // 4 = Critical, 3 = High, 2 = Medium
   const [loading, setLoading] = useState(false);
   const [dispatchResult, setDispatchResult] = useState(null);
@@ -135,8 +136,13 @@ export default function App() {
       ])
     ).start();
 
-    fetchLocations().then((locs) => {
-      if (locs && locs.length > 0) setLocations(locs);
+    fetchLocations().then((res) => {
+      if (res) {
+        const locs = Array.isArray(res) ? res : res.locations;
+        const coords = Array.isArray(res) ? {} : (res.coords || {});
+        if (locs && locs.length > 0) setLocations(locs);
+        if (coords && Object.keys(coords).length > 0) setLocationCoords(coords);
+      }
     });
 
     // Auto-detect live GPS coordinates on startup
@@ -613,6 +619,7 @@ export default function App() {
               activeStepIndex={trackingStepIndex}
               ambulanceId={dispatchResult.assignedAmbulance?.id}
               userRole="citizen"
+              customCoords={locationCoords}
             />
 
             {/* COMPLETE 2-STAGE LIVE TRIP TRACKER */}
@@ -981,6 +988,7 @@ export default function App() {
                   }
                   ambulanceId={driverUser?.ambulanceId || driverAmbId}
                   userRole="driver"
+                  customCoords={locationCoords}
                 />
 
                 <View style={styles.card}>
@@ -1390,8 +1398,13 @@ export default function App() {
                   setApiBaseUrl(serverUrlInput);
                   setShowServerModal(false);
                   showAlert("Server Updated", `Backend endpoint set to:\n${serverUrlInput}`);
-                  fetchLocations().then((locs) => {
-                    if (locs && locs.length) setLocations(locs);
+                  fetchLocations().then((res) => {
+                    if (res) {
+                      const locs = Array.isArray(res) ? res : res.locations;
+                      const coords = Array.isArray(res) ? {} : (res.coords || {});
+                      if (locs && locs.length) setLocations(locs);
+                      if (coords && Object.keys(coords).length > 0) setLocationCoords(coords);
+                    }
                   });
                 }}
               >

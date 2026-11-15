@@ -128,25 +128,41 @@ export async function triggerSOS({
 }
 
 /**
- * Fetch list of known city locations/zones.
+ * Fetch list of known city locations/zones and coordinate registry.
  */
 export async function fetchLocations() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/locations`);
     const data = await res.json();
-    return data.locations;
+    return {
+      locations: Array.isArray(data) ? data : (data.locations || []),
+      coords: data.coords || {},
+    };
   } catch (e) {
-    return [
-      "Gulshan",
-      "Nazimabad",
-      "North Karachi",
-      "Saddar",
-      "Clifton",
-      "Defense",
-      "Airport",
-      "Malir",
-      "Shahrah-e-Faisal",
-    ];
+    return {
+      locations: [
+        "Gulshan",
+        "Nazimabad",
+        "North Karachi",
+        "Saddar",
+        "Clifton",
+        "Defense",
+        "Airport",
+        "Malir",
+        "Shahrah-e-Faisal",
+      ],
+      coords: {
+        "North Karachi":    { x: 180, y: 70 },
+        "Nazimabad":        { x: 150, y: 190 },
+        "Gulshan":          { x: 420, y: 140 },
+        "Saddar":           { x: 270, y: 290 },
+        "Airport":          { x: 670, y: 170 },
+        "Malir":            { x: 770, y: 130 },
+        "Shahrah-e-Faisal": { x: 480, y: 260 },
+        "Clifton":          { x: 200, y: 400 },
+        "Defense":          { x: 490, y: 390 },
+      },
+    };
   }
 }
 

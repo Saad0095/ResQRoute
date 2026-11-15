@@ -44,6 +44,7 @@ export default function LiveVisualMap({
   activeStepIndex = 0,
   ambulanceId = 102,
   userRole = "citizen", // "citizen" or "driver"
+  customCoords = {},
 }) {
   const fullRoute = [
     ...(pickupRoute || []),
@@ -52,6 +53,19 @@ export default function LiveVisualMap({
 
   const getCoord = (zone) => {
     if (!zone) return { x: 165, y: 120 };
+    // Check if custom coordinates provided by backend / admin registry
+    if (customCoords && customCoords[zone]) {
+      const c = customCoords[zone];
+      if (typeof c.x === "number" && typeof c.y === "number") {
+        // Dynamic scaling: map web coordinate space [50..800, 50..420] into mobile canvas [30..310, 30..220]
+        const scaledX = Math.round(30 + ((c.x - 50) / 750) * 280);
+        const scaledY = Math.round(30 + ((c.y - 50) / 370) * 190);
+        return {
+          x: Math.max(25, Math.min(315, scaledX)),
+          y: Math.max(25, Math.min(225, scaledY)),
+        };
+      }
+    }
     if (defaultNodeCoords[zone]) return defaultNodeCoords[zone];
     let hash = 0;
     for (let i = 0; i < zone.length; i++) {
@@ -152,7 +166,13 @@ export default function LiveVisualMap({
     );
   };
 
-  const distinctNodes = Object.keys(defaultNodeCoords);
+  const distinctNodes = Array.from(
+    new Set([
+      ...Object.keys(defaultNodeCoords),
+      ...Object.keys(customCoords || {}),
+      ...(fullRoute || []),
+    ])
+  );
 
   return (
     <View style={styles.container}>

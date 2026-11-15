@@ -204,13 +204,15 @@
   <script>
     // Node 2D coordinates for Karachi city layout
     const nodeCoords = {
-      "North Karachi": { x: 180, y: 70 },
-      "Nazimabad":     { x: 140, y: 190 },
-      "Gulshan":       { x: 380, y: 140 },
-      "Saddar":        { x: 260, y: 280 },
-      "Airport":       { x: 620, y: 180 },
-      "Clifton":       { x: 200, y: 380 },
-      "Defense":       { x: 440, y: 360 }
+      "North Karachi":    { x: 180, y: 70 },
+      "Nazimabad":        { x: 140, y: 190 },
+      "Gulshan":          { x: 380, y: 140 },
+      "Saddar":           { x: 260, y: 280 },
+      "Airport":          { x: 620, y: 180 },
+      "Clifton":          { x: 200, y: 380 },
+      "Defense":          { x: 440, y: 360 },
+      "Malir":            { x: 770, y: 130 },
+      "Shahrah-e-Faisal": { x: 480, y: 260 }
     };
 
     let activeRoute = [];
@@ -224,6 +226,9 @@
         ]);
         const statusData = await statusRes.json();
         const roadsData = await roadsRes.json();
+        if (statusData.coords) {
+          Object.assign(nodeCoords, statusData.coords);
+        }
         state = { ...statusData, roads: roadsData.roads };
         renderDashboard();
       } catch (err) {
