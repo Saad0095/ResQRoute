@@ -18,6 +18,8 @@ custom_node_coords: Dict[str, Dict[str, int]] = {
     "Shahrah-e-Faisal": {"x": 480, "y": 260},
     "Clifton":          {"x": 200, "y": 400},
     "Defense":          {"x": 490, "y": 390},
+    "Gulistan-e-Jauhar":{"x": 440, "y": 70},
+    "Gulistan-e-Johar": {"x": 440, "y": 70},
 }
 
 graph: CityGraph = build_default_city_map()
@@ -113,15 +115,34 @@ def register_node_and_coords(
                 graph.add_road(clean_loc, other[0], float(distance_km))
 
     # 2. Register coordinates
+    norm = clean_loc.lower().replace(" ", "").replace("-", "")
     if x is not None and y is not None:
         custom_node_coords[clean_loc] = {"x": int(x), "y": int(y)}
+    elif "jauhar" in norm or "johar" in norm:
+        # Gulistan-e-Jauhar is directly above Gulshan
+        custom_node_coords[clean_loc] = {"x": 440, "y": 70}
+    elif "korangi" in norm:
+        custom_node_coords[clean_loc] = {"x": 600, "y": 380}
+    elif "pechs" in norm:
+        custom_node_coords[clean_loc] = {"x": 360, "y": 270}
+    elif "gulberg" in norm:
+        custom_node_coords[clean_loc] = {"x": 290, "y": 140}
+    elif "bahria" in norm:
+        custom_node_coords[clean_loc] = {"x": 750, "y": 60}
     elif clean_loc not in custom_node_coords:
         if connected_to and connected_to in custom_node_coords:
             base = custom_node_coords[connected_to]
-            custom_node_coords[clean_loc] = {
-                "x": min(800, max(60, base["x"] + 60)),
-                "y": min(410, max(60, base["y"] + 35))
-            }
+            # If connected to Gulshan or high Y base, place above
+            if connected_to == "Gulshan" or base["y"] >= 140:
+                custom_node_coords[clean_loc] = {
+                    "x": min(800, max(60, base["x"] + 20)),
+                    "y": max(50, base["y"] - 70)
+                }
+            else:
+                custom_node_coords[clean_loc] = {
+                    "x": min(800, max(60, base["x"] + 60)),
+                    "y": min(410, max(60, base["y"] + 35))
+                }
         else:
             idx = len(custom_node_coords)
             custom_node_coords[clean_loc] = {

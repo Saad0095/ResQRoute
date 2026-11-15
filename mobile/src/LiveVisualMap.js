@@ -12,6 +12,8 @@ const defaultNodeCoords = {
   "Shahrah-e-Faisal": { x: 195, y: 140 },
   "Clifton":          { x: 80,  y: 215 },
   "Defense":          { x: 190, y: 210 },
+  "Gulistan-e-Jauhar":{ x: 175, y: 35 },
+  "Gulistan-e-Johar": { x: 175, y: 35 },
 };
 
 // Full city road network matching backend graph

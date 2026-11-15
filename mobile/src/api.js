@@ -150,6 +150,7 @@ export async function fetchLocations() {
         "Airport",
         "Malir",
         "Shahrah-e-Faisal",
+        "Gulistan-e-Jauhar",
       ],
       coords: {
         "North Karachi":    { x: 180, y: 70 },
@@ -161,6 +162,7 @@ export async function fetchLocations() {
         "Shahrah-e-Faisal": { x: 480, y: 260 },
         "Clifton":          { x: 200, y: 400 },
         "Defense":          { x: 490, y: 390 },
+        "Gulistan-e-Jauhar":{"x": 440, "y": 70 },
       },
     };
   }

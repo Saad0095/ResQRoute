@@ -11,6 +11,8 @@ const defaultNodeCoords = {
   "Shahrah-e-Faisal": { x: 480, y: 260 },
   "Clifton":          { x: 200, y: 400 },
   "Defense":          { x: 490, y: 390 },
+  "Gulistan-e-Jauhar":{ x: 440, y: 70 },
+  "Gulistan-e-Johar": { x: 440, y: 70 },
 };
 
 export default function CityMap({ state, activeRoute, activeDispatch, onClearRoute }) {

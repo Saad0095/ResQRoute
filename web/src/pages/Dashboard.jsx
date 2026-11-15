@@ -71,7 +71,14 @@ export default function Dashboard({ user, onLogout }) {
 
   // Dynamic Location & Road Creation Modals
   const [showAddLocation, setShowAddLocation] = useState(false);
-  const [newLocation, setNewLocation] = useState({ name: "", connectedTo: "Shahrah-e-Faisal", distanceKm: 6.0 });
+  const [newLocation, setNewLocation] = useState({
+    name: "",
+    connectedTo: "Gulshan",
+    distanceKm: 5.0,
+    direction: "above",
+    x: 440,
+    y: 70,
+  });
   const [showAddRoad, setShowAddRoad] = useState(false);
   const [newRoad, setNewRoad] = useState({ u: "Malir", v: "Saddar", weight: 15.0 });
 
@@ -330,6 +337,32 @@ export default function Dashboard({ user, onLogout }) {
   };
 
   // Location & Road Actions
+  const updateLocationPlacement = (connectedSector, dir, currentName) => {
+    const base = state?.coords?.[connectedSector] || { x: 420, y: 140 };
+    let newX = base.x;
+    let newY = base.y;
+
+    const norm = (currentName || "").toLowerCase().replace(/[^a-z]/g, "");
+    if (norm.includes("jauhar") || norm.includes("johar")) {
+      newX = 440;
+      newY = 70;
+    } else if (dir === "above") {
+      newX = Math.min(800, Math.max(60, base.x + 15));
+      newY = Math.max(50, base.y - 70);
+    } else if (dir === "below") {
+      newX = Math.min(800, Math.max(60, base.x + 10));
+      newY = Math.min(410, base.y + 70);
+    } else if (dir === "right") {
+      newX = Math.min(800, base.x + 80);
+      newY = base.y;
+    } else if (dir === "left") {
+      newX = Math.max(60, base.x - 80);
+      newY = base.y;
+    }
+
+    return { x: newX, y: newY };
+  };
+
   const handleCreateLocation = async (e) => {
     e.preventDefault();
     if (!newLocation.name.trim()) {
@@ -341,10 +374,19 @@ export default function Dashboard({ user, onLogout }) {
         name: newLocation.name.trim(),
         connectedTo: newLocation.connectedTo,
         distanceKm: parseFloat(newLocation.distanceKm) || 5.0,
+        x: parseInt(newLocation.x) || 440,
+        y: parseInt(newLocation.y) || 70,
       });
-      showMsg(`Location "${newLocation.name}" added to city map!`);
+      showMsg(`Location "${newLocation.name}" added to city map at (X: ${newLocation.x}, Y: ${newLocation.y})!`);
       setShowAddLocation(false);
-      setNewLocation({ name: "", connectedTo: "Shahrah-e-Faisal", distanceKm: 6.0 });
+      setNewLocation({
+        name: "",
+        connectedTo: "Gulshan",
+        distanceKm: 5.0,
+        direction: "above",
+        x: 440,
+        y: 70,
+      });
       await loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -1923,9 +1965,24 @@ export default function Dashboard({ user, onLogout }) {
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Sector Name *</label>
                   <input
                     required
-                    placeholder="e.g. Korangi, PECHS, Gulberg"
+                    placeholder="e.g. Gulistan-e-Jauhar, Korangi, PECHS"
                     value={newLocation.name}
-                    onChange={(e) => setNewLocation({ ...newLocation, name: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const norm = val.toLowerCase().replace(/[^a-z]/g, "");
+                      if (norm.includes("jauhar") || norm.includes("johar")) {
+                        setNewLocation({
+                          ...newLocation,
+                          name: val,
+                          connectedTo: "Gulshan",
+                          direction: "above",
+                          x: 440,
+                          y: 70,
+                        });
+                      } else {
+                        setNewLocation({ ...newLocation, name: val });
+                      }
+                    }}
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-600 transition"
                   />
                 </div>
@@ -1934,7 +1991,16 @@ export default function Dashboard({ user, onLogout }) {
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Connect Directly To Existing Sector *</label>
                   <select
                     value={newLocation.connectedTo}
-                    onChange={(e) => setNewLocation({ ...newLocation, connectedTo: e.target.value })}
+                    onChange={(e) => {
+                      const sel = e.target.value;
+                      const coords = updateLocationPlacement(sel, newLocation.direction, newLocation.name);
+                      setNewLocation({
+                        ...newLocation,
+                        connectedTo: sel,
+                        x: coords.x,
+                        y: coords.y,
+                      });
+                    }}
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-600 transition"
                   >
                     {zonesList.map((z) => (
@@ -1954,6 +2020,89 @@ export default function Dashboard({ user, onLogout }) {
                     onChange={(e) => setNewLocation({ ...newLocation, distanceKm: e.target.value })}
                     className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-600 transition"
                   />
+                </div>
+
+                <div>
+                  <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">
+                    Map Placement Relative to {newLocation.connectedTo} *
+                  </label>
+                  <div className="grid grid-cols-4 gap-1.5 mb-2">
+                    {[
+                      { id: "above", label: "⬆️ Above" },
+                      { id: "right", label: "➡️ Right" },
+                      { id: "below", label: "⬇️ Below" },
+                      { id: "left", label: "⬅️ Left" },
+                    ].map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          const coords = updateLocationPlacement(newLocation.connectedTo, d.id, newLocation.name);
+                          setNewLocation({
+                            ...newLocation,
+                            direction: d.id,
+                            x: coords.x,
+                            y: coords.y,
+                          });
+                        }}
+                        className={`py-1.5 px-2 rounded-lg text-center font-medium transition text-[11px] border ${
+                          newLocation.direction === d.id
+                            ? "bg-sky-50 dark:bg-sky-950/60 border-sky-600 text-sky-700 dark:text-sky-300 font-bold"
+                            : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                        }`}
+                      >
+                        {d.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                      Map X Coordinate <span className="text-[10px] text-slate-400 font-normal">(50-800)</span>
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      min="50"
+                      max="800"
+                      value={newLocation.x}
+                      onChange={(e) => setNewLocation({ ...newLocation, x: parseInt(e.target.value) || 0, direction: "custom" })}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-600 transition"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1">
+                      Map Y Coordinate <span className="text-[10px] text-slate-400 font-normal">(50-420)</span>
+                    </label>
+                    <input
+                      required
+                      type="number"
+                      min="50"
+                      max="420"
+                      value={newLocation.y}
+                      onChange={(e) => setNewLocation({ ...newLocation, y: parseInt(e.target.value) || 0, direction: "custom" })}
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-sky-600 transition"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800/60 rounded-lg p-2.5 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-600 dark:text-slate-300">
+                    📍 Placement: <strong>({newLocation.x}, {newLocation.y})</strong>
+                  </span>
+                  <span className="text-sky-600 dark:text-sky-400 font-semibold">
+                    {newLocation.direction === "above"
+                      ? `Directly above ${newLocation.connectedTo}`
+                      : newLocation.direction === "right"
+                      ? `To the right of ${newLocation.connectedTo}`
+                      : newLocation.direction === "below"
+                      ? `Below ${newLocation.connectedTo}`
+                      : newLocation.direction === "left"
+                      ? `To the left of ${newLocation.connectedTo}`
+                      : "Custom placement"}
+                  </span>
                 </div>
               </div>
 
