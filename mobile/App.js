@@ -27,6 +27,7 @@ import {
   setApiBaseUrl,
 } from "./src/api";
 import { theme } from "./src/theme";
+import LiveVisualMap from "./src/LiveVisualMap";
 
 export default function App() {
   // App Role: 'citizen' or 'driver'
@@ -602,6 +603,18 @@ export default function App() {
               </View>
             </View>
 
+            {/* LIVE GPS VISUALIZATION MAP FOR CITIZEN */}
+            <LiveVisualMap
+              pickupRoute={dispatchResult.ambulanceRoute}
+              hospitalRoute={dispatchResult.hospitalRoute}
+              patientLocation={selectedLocation}
+              hospitalName={dispatchResult.assignedHospital?.name}
+              hospitalLocation={dispatchResult.assignedHospital?.location}
+              activeStepIndex={trackingStepIndex}
+              ambulanceId={dispatchResult.assignedAmbulance?.id}
+              userRole="citizen"
+            />
+
             {/* COMPLETE 2-STAGE LIVE TRIP TRACKER */}
             {(() => {
               const pickupRoute = dispatchResult.ambulanceRoute || [];
@@ -935,6 +948,26 @@ export default function App() {
                     </Text>
                   </View>
                 </View>
+
+                {/* LIVE GPS VISUALIZATION MAP FOR DRIVER */}
+                <LiveVisualMap
+                  pickupRoute={driverMission.ambulanceRoute || [driverLocation, driverMission.patientLocation]}
+                  hospitalRoute={driverMission.hospitalRoute || [driverMission.patientLocation, driverMission.hospitalLocation]}
+                  patientLocation={driverMission.patientLocation}
+                  hospitalName={driverMission.hospitalName}
+                  hospitalLocation={driverMission.hospitalLocation}
+                  activeStepIndex={
+                    driverStatus === "Completed"
+                      ? 999
+                      : driverStatus === "Transporting"
+                      ? (driverMission.ambulanceRoute?.length || 2)
+                      : driverStatus === "At Scene"
+                      ? (driverMission.ambulanceRoute?.length || 2) - 1
+                      : 0
+                  }
+                  ambulanceId={driverUser?.ambulanceId || driverAmbId}
+                  userRole="driver"
+                />
 
                 <View style={styles.card}>
                   <Text style={styles.cardHeader}>🗺️ 2-STAGE FASTEST EMERGENCY ROUTE</Text>
