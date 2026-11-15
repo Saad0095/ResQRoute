@@ -267,7 +267,7 @@ export default function App() {
       } else {
         showAlert(
           "Notice",
-          response?.message || "Could not dispatch an ambulance. Queue is full."
+          response?.message || "Could not dispatch an ambulance at this moment. All emergency response units are currently responding to active emergencies."
         );
       }
     } catch (err) {
@@ -646,14 +646,40 @@ export default function App() {
               </View>
 
               <View style={{ marginTop: 12, padding: 10, backgroundColor: "#1E293B", borderRadius: 8 }}>
-                <Text style={{ color: "#94A3B8", fontSize: 11 }}>
+                <Text style={{ color: "#94A3B8", fontSize: 11 }} selectable={true}>
                   Current Position: <Text style={{ color: "#38BDF8", fontWeight: "bold" }}>{dispatchResult.ambulanceRoute[trackingStepIndex] || selectedLocation}</Text>
                 </Text>
-                <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }}>
+                <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }} selectable={true}>
                   Heading to: <Text style={{ color: "#FFFFFF", fontWeight: "bold" }}>{selectedLocation}</Text>
                 </Text>
               </View>
             </View>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: "#1E293B",
+                borderWidth: 1,
+                borderColor: "#334155",
+                borderRadius: 10,
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                marginBottom: 12,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
+              onPress={() => {
+                const text = `Emergency Call #${dispatchResult.emergencyId}\nAssigned Unit: Ambulance #${dispatchResult.assignedAmbulance?.id} (${dispatchResult.assignedAmbulance?.driverName}, Phone: ${dispatchResult.assignedAmbulance?.phone})\nDestination: ${dispatchResult.assignedHospital?.name}\nRoute: ${dispatchResult.ambulanceRoute?.join(" → ")} (${dispatchResult.ambulanceDistanceKm} km)`;
+                if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                  navigator.clipboard.writeText(text);
+                }
+                showAlert("Copied", "Emergency details & navigation route copied to clipboard!");
+              }}
+            >
+              <Text style={{ fontSize: 14 }}>📋</Text>
+              <Text style={{ color: "#E2E8F0", fontSize: 12, fontWeight: "600" }}>Copy Emergency & Route Details</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.cancelButton}
@@ -826,6 +852,32 @@ export default function App() {
                       </View>
                     ))}
                   </View>
+
+                  <TouchableOpacity
+                    style={{
+                      marginTop: 12,
+                      paddingVertical: 9,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: "#CBD5E1",
+                      backgroundColor: "#F8FAFC",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                    }}
+                    onPress={() => {
+                      const text = `Emergency Incident #${driverMission.emergencyId}\nPatient Sector: ${driverMission.patientLocation}\nDestination Hospital: ${driverMission.hospitalName} (${driverMission.hospitalLocation})\nRoute: ${driverMission.route?.join(" → ")}`;
+                      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText(text);
+                      }
+                      showAlert("Copied", "Mission route & target hospital copied to clipboard!");
+                    }}
+                  >
+                    <Text style={{ fontSize: 13 }}>📋</Text>
+                    <Text style={{ color: "#334155", fontSize: 11, fontWeight: "600" }}>Copy Navigation Route & Hospital</Text>
+                  </TouchableOpacity>
                 </View>
 
                 {/* ACTION PROGRESS BUTTONS */}

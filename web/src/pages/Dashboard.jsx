@@ -761,13 +761,13 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              {/* Dijkstra Journey & Path Inspector (e.g. Malir -> Saddar via Shahrah-e-Faisal) */}
+              {/* Smart Emergency Journey & Route Inspector */}
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                   <div>
                     <h2 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
-                      Dijkstra Shortest Path & Route Inspector
+                      Emergency Route Navigator & Trip Inspector
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       Test navigation between sectors (e.g. going from <strong>Malir</strong> to <strong>Saddar</strong> passes <strong>Shahrah-e-Faisal</strong>)
@@ -816,7 +816,7 @@ export default function Dashboard({ user, onLogout }) {
                       disabled={inspectingRoute}
                       className="w-full bg-sky-600 hover:bg-sky-700 text-white font-medium py-2 rounded-lg text-xs transition disabled:opacity-50 shadow-sm"
                     >
-                      {inspectingRoute ? "Calculating Shortest Path..." : "Find Shortest Route"}
+                      {inspectingRoute ? "Calculating Fastest Route..." : "Find Fastest Route"}
                     </button>
                   </div>
                 </form>
@@ -825,10 +825,24 @@ export default function Dashboard({ user, onLogout }) {
                   <div className="mt-4 p-4 rounded-lg bg-sky-50 dark:bg-sky-950/50 border border-sky-200 dark:border-sky-900/80">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="text-[11px] font-bold uppercase tracking-wider text-sky-800 dark:text-sky-300">
-                          Shortest Computed Route (Dijkstra)
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+                            Fastest Recommended Route
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard?.writeText(
+                                `Route: ${inspectionResult.path.join(" → ")} (${inspectionResult.distanceKm} km, ~${inspectionResult.etaMinutes} mins)`
+                              );
+                              showMsg("Route copied to clipboard!");
+                            }}
+                            className="px-2 py-0.5 text-[10px] rounded bg-white dark:bg-slate-900 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900 transition font-semibold"
+                          >
+                            📋 Copy Route
+                          </button>
                         </div>
-                        <div className="text-sm font-bold text-slate-900 dark:text-white mt-1 flex flex-wrap items-center gap-1.5">
+                        <div className="text-sm font-bold text-slate-900 dark:text-white mt-1.5 flex flex-wrap items-center gap-1.5 select-all">
                           {inspectionResult.path.map((step, i) => (
                             <React.Fragment key={step}>
                               <span className="px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs">
@@ -853,7 +867,7 @@ export default function Dashboard({ user, onLogout }) {
                       </div>
                     </div>
                     <p className="text-[11px] text-sky-700 dark:text-sky-400 mt-2">
-                      💡 Tip: Click any road card below to mark it <strong>Closed</strong>, then click <em>Find Shortest Route</em> again to observe dynamic detours!
+                      💡 Tip: Click any road card below to mark it <strong>Closed</strong>, then click <em>Find Fastest Route</em> again to observe live detours!
                     </p>
                   </div>
                 )}
@@ -1053,7 +1067,23 @@ export default function Dashboard({ user, onLogout }) {
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                     {incidents.map((inc) => (
                       <tr key={inc.id} className="text-slate-700 dark:text-slate-300">
-                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">{inc.emergencyId}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-1.5">
+                            <span>{inc.emergencyId}</span>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard?.writeText(
+                                  `Emergency Call ${inc.emergencyId}: Patient ${inc.patientName} (${inc.location}), Ambulance Unit #${inc.ambulanceId || "N/A"}, Distance: ${inc.distanceKm?.toFixed(1)} km, Status: ${inc.status}`
+                                );
+                                showMsg(`Incident ${inc.emergencyId} copied to clipboard!`);
+                              }}
+                              title="Copy Call Summary"
+                              className="text-slate-400 hover:text-slate-700 dark:hover:text-white transition text-xs"
+                            >
+                              📋
+                            </button>
+                          </div>
+                        </td>
                         <td className="px-4 py-3">{inc.patientName}</td>
                         <td className="px-4 py-3">{inc.location}</td>
                         <td className="px-4 py-3">
@@ -1587,7 +1617,7 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm text-slate-900 dark:text-white">Add City Sector / Location</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Expand the dynamic Karachi road graph</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Expand the Karachi city sectors and map network</p>
                 </div>
               </div>
               <button

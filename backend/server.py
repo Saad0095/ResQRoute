@@ -29,7 +29,7 @@ from routers.admin import router as admin_router
 
 app = FastAPI(
     title="ResQRoute Intelligent Emergency Dispatch API",
-    description="Enterprise Backend DSA Engine combining Priority Queue Triage with Dijkstra's Shortest Path Routing.",
+    description="Real-Time Emergency Dispatch & Intelligent Arterial Routing Engine.",
     version="3.0.0"
 )
 
