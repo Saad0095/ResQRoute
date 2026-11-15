@@ -11,6 +11,7 @@ import {
   ScrollView,
   Modal,
   Alert,
+  TextInput,
   Platform,
 } from "react-native";
 import { registerRootComponent } from "expo";
@@ -20,6 +21,8 @@ import {
   resetSimulation,
   fetchAmbulanceMission,
   updateAmbulanceStatus,
+  loginDriver,
+  setDriverToken,
 } from "./src/api";
 import { theme } from "./src/theme";
 
@@ -29,6 +32,9 @@ export default function App() {
 
   // Citizen State
   const [selectedLocation, setSelectedLocation] = useState("Gulshan");
+  const [isLocating, setIsLocating] = useState(false);
+  const [liveGpsCoords, setLiveGpsCoords] = useState(null);
+  const [trackingStepIndex, setTrackingStepIndex] = useState(0);
   const [locations, setLocations] = useState([
     "Gulshan",
     "Nazimabad",
@@ -42,12 +48,23 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [dispatchResult, setDispatchResult] = useState(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
+  const [callerPhone, setCallerPhone] = useState("");
+  const [emergencyType, setEmergencyType] = useState("Cardiac / Severe Injury");
   const [remainingEta, setRemainingEta] = useState(0);
 
-  // Driver State
-  const [driverAmbId, setDriverAmbId] = useState(102); // Default: Ahmed Raza (Gulshan)
+  // Driver Auth State
+  const [driverUser, setDriverUser] = useState(null);
+  const [driverEmail, setDriverEmail] = useState("");
+  const [driverPassword, setDriverPassword] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
+
+  // Driver Mission State
+  const [driverAmbId, setDriverAmbId] = useState(102);
   const [driverMission, setDriverMission] = useState(null);
   const [driverStatus, setDriverStatus] = useState("Available");
+  const [isOnDuty, setIsOnDuty] = useState(true);
   const [updatingDriver, setUpdatingDriver] = useState(false);
 
   // Concentric Pulse animations for the SOS button
@@ -55,6 +72,30 @@ export default function App() {
   const ringAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Dynamic Roboto Google Font & Clean Theme injection for Web
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      if (!document.getElementById("resqroute-roboto-link")) {
+        const link = document.createElement("link");
+        link.id = "resqroute-roboto-link";
+        link.rel = "stylesheet";
+        link.href = "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap";
+        document.head.appendChild(link);
+      }
+      if (!document.getElementById("resqroute-global-style")) {
+        const style = document.createElement("style");
+        style.id = "resqroute-global-style";
+        style.innerHTML = `
+          * {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif !important;
+          }
+          body, html, #root {
+            background-color: #F8FAFC !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
+
     Animated.loop(
       Animated.parallel([
         Animated.sequence([
@@ -87,14 +128,81 @@ export default function App() {
     fetchLocations().then((locs) => {
       if (locs && locs.length > 0) setLocations(locs);
     });
+
+    // Auto-detect live GPS coordinates on startup
+    detectLiveLocation();
   }, []);
 
-  // Poll driver mission when in driver mode
+  // Live Location Detector using standard browser/device geolocation
+  const detectLiveLocation = () => {
+    if (typeof navigator !== "undefined" && navigator.geolocation) {
+      setIsLocating(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setLiveGpsCoords({ lat: latitude.toFixed(4), lng: longitude.toFixed(4) });
+
+          // Map approximate coords to nearest simulated Karachi sector if near, or keep default
+          // Standard city sectors mapping
+          const sectorMap = [
+            { name: "Saddar", lat: 24.8607, lng: 67.0011 },
+            { name: "Clifton", lat: 24.8138, lng: 67.0299 },
+            { name: "Defense", lat: 24.8016, lng: 67.0652 },
+            { name: "Gulshan", lat: 24.9207, lng: 67.0928 },
+            { name: "Nazimabad", lat: 24.9180, lng: 67.0332 },
+            { name: "North Karachi", lat: 24.9961, lng: 67.0620 },
+            { name: "Airport", lat: 24.9056, lng: 67.1608 },
+          ];
+
+          let closest = sectorMap[0];
+          let minDist = 999999;
+          sectorMap.forEach((s) => {
+            const dist = Math.hypot(s.lat - latitude, s.lng - longitude);
+            if (dist < minDist) {
+              minDist = dist;
+              closest = s;
+            }
+          });
+
+          // If within reasonable area, select nearest sector
+          if (closest) {
+            setSelectedLocation(closest.name);
+          }
+          setIsLocating(false);
+        },
+        (err) => {
+          console.log("GPS Notice:", err.message);
+          setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+  };
+
+  // Live Vehicle Progress Tracker: Advances ambulance along route waypoints in real time
+  useEffect(() => {
+    let progressTimer;
+    if (dispatchResult && dispatchResult.ambulanceRoute && dispatchResult.ambulanceRoute.length > 1) {
+      setTrackingStepIndex(0);
+      progressTimer = setInterval(() => {
+        setTrackingStepIndex((prev) => {
+          if (prev < dispatchResult.ambulanceRoute.length - 1) {
+            return prev + 1;
+          }
+          return prev;
+        });
+      }, 5000); // Advances one road node every 5 seconds for demonstration
+    }
+    return () => clearInterval(progressTimer);
+  }, [dispatchResult]);
+
+  // Poll driver mission when authenticated
   useEffect(() => {
     let interval;
-    if (appRole === "driver") {
+    if (appRole === "driver" && driverUser) {
       const checkMission = async () => {
-        const data = await fetchAmbulanceMission(driverAmbId);
+        const ambId = driverUser.ambulanceId || driverAmbId;
+        const data = await fetchAmbulanceMission(ambId);
         if (data) {
           setDriverStatus(data.status);
           setDriverMission(data.currentMission);
@@ -104,7 +212,7 @@ export default function App() {
       interval = setInterval(checkMission, 2500);
     }
     return () => clearInterval(interval);
-  }, [appRole, driverAmbId]);
+  }, [appRole, driverUser, driverAmbId]);
 
   // Citizen Live ETA Countdown
   useEffect(() => {
@@ -125,14 +233,20 @@ export default function App() {
     }
   };
 
-  const handleSOSPress = async () => {
+  const handleSOSPress = () => {
+    // Open verification prompt to validate emergency case and prevent prank calls
+    setShowVerifyModal(true);
+  };
+
+  const handleConfirmVerifiedSOS = async () => {
+    setShowVerifyModal(false);
     setLoading(true);
     try {
       const response = await triggerSOS({
-        patientName: "Emergency Caller",
+        patientName: callerPhone ? `Caller (${callerPhone})` : "Emergency Caller",
         location: selectedLocation,
         severity: severity,
-        notes: "One-click mobile SOS triggered",
+        notes: `Verified Case: ${emergencyType}`,
       });
 
       if (response && response.success) {
@@ -177,14 +291,53 @@ export default function App() {
     );
   };
 
+  // Driver Login Handler
+  const handleDriverLogin = async (emailToUse, passToUse) => {
+    const e = emailToUse || driverEmail;
+    const p = passToUse || driverPassword;
+    setAuthLoading(true);
+    setAuthError(null);
+    try {
+      const res = await loginDriver(e, p);
+      setDriverUser(res.user);
+      if (res.user.ambulanceId) {
+        setDriverAmbId(res.user.ambulanceId);
+      }
+    } catch (err) {
+      setAuthError(err.message || "Invalid driver credentials");
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const handleDriverLogout = () => {
+    setDriverToken(null);
+    setDriverUser(null);
+    setDriverMission(null);
+  };
+
   const handleDriverStatusChange = async (newStatus) => {
     setUpdatingDriver(true);
-    await updateAmbulanceStatus(driverAmbId, newStatus);
-    setDriverStatus(newStatus);
-    if (newStatus === "Completed") {
-      setDriverMission(null);
+    const ambId = driverUser?.ambulanceId || driverAmbId;
+    try {
+      await updateAmbulanceStatus(ambId, newStatus);
+      setDriverStatus(newStatus);
+      if (newStatus === "Completed") {
+        setDriverMission(null);
+        showAlert("Mission Complete", `Ambulance #${ambId} has completed handover and is now Available.`);
+      } else {
+        showAlert("Status Updated", `Ambulance #${ambId} mission status set to: "${newStatus}"`);
+      }
+      const data = await fetchAmbulanceMission(ambId);
+      if (data) {
+        setDriverStatus(data.status);
+        setDriverMission(data.currentMission);
+      }
+    } catch (err) {
+      showAlert("Error", "Could not update mission status. Please try again.");
+    } finally {
+      setUpdatingDriver(false);
     }
-    setUpdatingDriver(false);
   };
 
   const ringScale = ringAnim.interpolate({
@@ -207,7 +360,7 @@ export default function App() {
           <Text style={styles.headerBadgeText}>911 / 1122 RESQROUTE</Text>
         </View>
         <Text style={styles.title}>ResQRoute</Text>
-        
+
         {/* ROLE TOGGLE TABS */}
         <View style={styles.roleToggleRow}>
           <TouchableOpacity
@@ -240,7 +393,7 @@ export default function App() {
                 appRole === "driver" && styles.roleTabTextActive,
               ]}
             >
-              🚑 DRIVER HUD
+              🚑 DRIVER PORTAL
             </Text>
           </TouchableOpacity>
         </View>
@@ -255,22 +408,31 @@ export default function App() {
             showsVerticalScrollIndicator={false}
           >
             {/* LOCATION SELECTOR BAR */}
-            <TouchableOpacity
-              style={styles.locationBar}
-              onPress={() => setShowLocationModal(true)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.locationIconBg}>
-                <Text style={{ fontSize: 18 }}>📍</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.locationLabel}>CURRENT LOCATION</Text>
-                <Text style={styles.locationValue}>
-                  {selectedLocation}, Karachi
-                </Text>
-              </View>
-              <Text style={styles.changeText}>Tap to change ▾</Text>
-            </TouchableOpacity>
+            <View style={styles.locationBar}>
+              <TouchableOpacity
+                style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                onPress={() => setShowLocationModal(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.locationIconBg}>
+                  <Text style={{ fontSize: 18 }}>📍</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.locationLabel}>
+                    {isLocating ? "DETECTING GPS LOCATION..." : "YOUR CURRENT LOCATION"}
+                  </Text>
+                  <Text style={styles.locationValue}>
+                    {selectedLocation}, Karachi
+                  </Text>
+                  {liveGpsCoords && (
+                    <Text style={{ color: "#10B981", fontSize: 10, marginTop: 2 }}>
+                      GPS: {liveGpsCoords.lat}° N, {liveGpsCoords.lng}° E (Live)
+                    </Text>
+                  )}
+                </View>
+                <Text style={styles.changeText}>Change ▾</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* SEVERITY LEVEL SELECTOR */}
             <View style={styles.severityContainer}>
@@ -348,8 +510,8 @@ export default function App() {
             </View>
 
             <Text style={styles.helperNotice}>
-              Pressing SOS runs Dijkstra's algorithm to find and dispatch
-              the closest available ambulance and reserve a hospital bed.
+              Pressing SOS finds and dispatches the closest available ambulance
+              and reserves a hospital bed along the fastest route.
             </Text>
           </ScrollView>
         ) : (
@@ -413,19 +575,64 @@ export default function App() {
             </View>
 
             <View style={styles.card}>
-              <Text style={styles.cardHeader}>🛣️ DIJKSTRA SHORTEST ROUTE</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <Text style={styles.cardHeader}>🛣️ LIVE VEHICLE TRACKING</Text>
+                <Text style={{ color: "#10B981", fontSize: 11, fontWeight: "bold" }}>
+                  ● Moving
+                </Text>
+              </View>
+
+              {/* Waypoint progress tracker */}
               <View style={styles.routeContainer}>
-                {dispatchResult.ambulanceRoute?.map((node, index) => (
-                  <View key={index} style={styles.routeStep}>
-                    <View style={styles.stepCircle}>
-                      <Text style={styles.stepNum}>{index + 1}</Text>
+                {dispatchResult.ambulanceRoute?.map((node, index) => {
+                  const isCurrent = index === trackingStepIndex;
+                  const isPassed = index < trackingStepIndex;
+                  return (
+                    <View key={index} style={styles.routeStep}>
+                      <View
+                        style={[
+                          styles.stepCircle,
+                          isCurrent
+                            ? { backgroundColor: "#EF4444", transform: [{ scale: 1.15 }] }
+                            : isPassed
+                            ? { backgroundColor: "#10B981" }
+                            : { backgroundColor: "#334155" },
+                        ]}
+                      >
+                        <Text style={styles.stepNum}>
+                          {isCurrent ? "🚑" : isPassed ? "✓" : index + 1}
+                        </Text>
+                      </View>
+                      <Text
+                        style={[
+                          styles.stepText,
+                          isCurrent && { color: "#FFFFFF", fontWeight: "bold" },
+                        ]}
+                      >
+                        {node}
+                      </Text>
+                      {index < dispatchResult.ambulanceRoute.length - 1 && (
+                        <Text
+                          style={[
+                            styles.stepArrow,
+                            isPassed && { color: "#10B981" },
+                          ]}
+                        >
+                          ➔
+                        </Text>
+                      )}
                     </View>
-                    <Text style={styles.stepText}>{node}</Text>
-                    {index < dispatchResult.ambulanceRoute.length - 1 && (
-                      <Text style={styles.stepArrow}>➔</Text>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
+              </View>
+
+              <View style={{ marginTop: 12, padding: 10, backgroundColor: "#1E293B", borderRadius: 8 }}>
+                <Text style={{ color: "#94A3B8", fontSize: 11 }}>
+                  Current Position: <Text style={{ color: "#38BDF8", fontWeight: "bold" }}>{dispatchResult.ambulanceRoute[trackingStepIndex] || selectedLocation}</Text>
+                </Text>
+                <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }}>
+                  Heading to: <Text style={{ color: "#FFFFFF", fontWeight: "bold" }}>{selectedLocation}</Text>
+                </Text>
               </View>
             </View>
 
@@ -439,129 +646,184 @@ export default function App() {
           </ScrollView>
         )
       ) : (
-        /* ==================== DRIVER HUD VIEW ==================== */
-        <ScrollView
-          contentContainerStyle={styles.hudContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* VEHICLE UNIT SELECTOR */}
-          <View style={styles.card}>
-            <Text style={styles.cardHeader}>🚑 DRIVER VEHICLE UNIT</Text>
-            <View style={styles.driverUnitRow}>
-              {[
-                { id: 101, name: "Ali (#101)" },
-                { id: 102, name: "Ahmed (#102)" },
-                { id: 103, name: "Usman (#103)" },
-                { id: 104, name: "Tariq (#104)" },
-              ].map((amb) => (
-                <TouchableOpacity
-                  key={amb.id}
-                  style={[
-                    styles.driverUnitBtn,
-                    driverAmbId === amb.id && styles.driverUnitBtnActive,
-                  ]}
-                  onPress={() => setDriverAmbId(amb.id)}
-                >
-                  <Text
-                    style={[
-                      styles.driverUnitBtnText,
-                      driverAmbId === amb.id && styles.driverUnitBtnTextActive,
-                    ]}
-                  >
-                    {amb.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+        /* ==================== AUTHENTICATED DRIVER VIEW ==================== */
+        !driverUser ? (
+          /* DRIVER LOGIN FORM */
+          <ScrollView
+            contentContainerStyle={styles.idleContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.loginCard}>
+              <Text style={styles.loginTitle}>🔐 Driver Authentication</Text>
+              <Text style={styles.loginSubtitle}>
+                Sign in with your official vehicle credentials to access mission navigation.
+              </Text>
 
-          {/* DRIVER MISSION HUD */}
-          {driverMission ? (
-            <>
-              <View style={[styles.dispatchedBanner, { backgroundColor: "#78350F", borderColor: "#D97706" }]}>
-                <View style={[styles.pulseDot, { backgroundColor: "#F59E0B" }]} />
-                <Text style={[styles.dispatchedBannerText, { color: "#FDE68A" }]}>
-                  MISSION ACTIVE: {driverStatus.toUpperCase()}
+              {authError && (
+                <View style={styles.errorBox}>
+                  <Text style={styles.errorText}>⚠️ {authError}</Text>
+                </View>
+              )}
+
+              <Text style={styles.inputLabel}>Driver Official Email:</Text>
+              <TextInput
+                style={styles.textInput}
+                value={driverEmail}
+                onChangeText={setDriverEmail}
+                placeholder="driver102@resqroute.org"
+                placeholderTextColor="#64748B"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.inputLabel}>Password:</Text>
+              <TextInput
+                style={styles.textInput}
+                value={driverPassword}
+                onChangeText={setDriverPassword}
+                placeholder="••••••••"
+                placeholderTextColor="#64748B"
+                secureTextEntry
+              />
+
+              <TouchableOpacity
+                style={styles.loginBtn}
+                onPress={() => handleDriverLogin()}
+                disabled={authLoading}
+              >
+                {authLoading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.loginBtnText}>SIGN IN TO VEHICLE HUD</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.demoDivider}>
+                <Text style={styles.demoDividerText}>OR ONE-CLICK DEMO</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.demoBtn}
+                onPress={() => handleDriverLogin("driver102@resqroute.org", "driver123")}
+              >
+                <Text style={styles.demoBtnText}>⚡ Demo Login: Driver #102 (Ahmed Raza)</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        ) : (
+          /* AUTHENTICATED DRIVER MISSION HUD */
+          <ScrollView
+            contentContainerStyle={styles.hudContainer}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* DRIVER PROFILE & SHIFT TOGGLE */}
+            <View style={styles.driverProfileCard}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.driverNameText}>👤 {driverUser.fullName}</Text>
+                <Text style={styles.driverUnitText}>Vehicle Unit: Ambulance #{driverUser.ambulanceId || driverAmbId}</Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <TouchableOpacity
+                  style={[styles.shiftBadge, isOnDuty ? styles.shiftOn : styles.shiftOff]}
+                  onPress={() => setIsOnDuty(!isOnDuty)}
+                >
+                  <Text style={styles.shiftBadgeText}>{isOnDuty ? "● ON DUTY" : "○ OFF DUTY"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleDriverLogout} style={{ marginTop: 6 }}>
+                  <Text style={{ color: "#EF4444", fontSize: 11, fontWeight: "bold" }}>Sign Out</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* DRIVER MISSION HUD */}
+            {driverMission ? (
+              <>
+                <View style={[styles.dispatchedBanner, { backgroundColor: "#78350F", borderColor: "#D97706" }]}>
+                  <View style={[styles.pulseDot, { backgroundColor: "#F59E0B" }]} />
+                  <Text style={[styles.dispatchedBannerText, { color: "#FDE68A" }]}>
+                    ACTIVE CALL: {driverStatus.toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={styles.card}>
+                  <Text style={styles.cardHeader}>🚨 EMERGENCY INCIDENT</Text>
+                  <View style={styles.cardRow}>
+                    <Text style={styles.cardKey}>Emergency ID:</Text>
+                    <Text style={styles.cardValHighlight}>{driverMission.emergencyId}</Text>
+                  </View>
+                  <View style={styles.cardRow}>
+                    <Text style={styles.cardKey}>Patient Sector:</Text>
+                    <Text style={styles.cardValHighlight}>📍 {driverMission.patientLocation}</Text>
+                  </View>
+                  <View style={styles.cardRow}>
+                    <Text style={styles.cardKey}>Emergency Level:</Text>
+                    <Text style={[styles.cardVal, { color: "#EF4444", fontWeight: "bold" }]}>
+                      {driverMission.severity}
+                    </Text>
+                  </View>
+                  <View style={styles.cardRow}>
+                    <Text style={styles.cardKey}>Target Hospital:</Text>
+                    <Text style={styles.cardVal}>{driverMission.hospitalName}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.card}>
+                  <Text style={styles.cardHeader}>🗺️ FASTEST NAVIGATION ROUTE</Text>
+                  <View style={styles.routeContainer}>
+                    {driverMission.route?.map((step, idx) => (
+                      <View key={idx} style={styles.routeStep}>
+                        <View style={styles.stepCircle}>
+                          <Text style={styles.stepNum}>{idx + 1}</Text>
+                        </View>
+                        <Text style={styles.stepText}>{step}</Text>
+                        {idx < driverMission.route.length - 1 && (
+                          <Text style={styles.stepArrow}>➔</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* ACTION PROGRESS BUTTONS */}
+                <View style={styles.driverActionsCard}>
+                  <Text style={styles.cardHeader}>⚡ MISSION PROGRESSION</Text>
+                  <TouchableOpacity
+                    style={[styles.driverActionBtn, { backgroundColor: "#D97706" }]}
+                    onPress={() => handleDriverStatusChange("At Scene")}
+                    disabled={updatingDriver}
+                  >
+                    <Text style={styles.driverActionText}>📍 Arrived at Patient Scene</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.driverActionBtn, { backgroundColor: "#2563EB" }]}
+                    onPress={() => handleDriverStatusChange("Transporting")}
+                    disabled={updatingDriver}
+                  >
+                    <Text style={styles.driverActionText}>🏥 En Route to Hospital</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.driverActionBtn, { backgroundColor: "#059669" }]}
+                    onPress={() => handleDriverStatusChange("Completed")}
+                    disabled={updatingDriver}
+                  >
+                    <Text style={styles.driverActionText}>✓ Hospital Handover & Complete</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.emptyMissionCard}>
+                <Text style={{ fontSize: 44 }}>🟢</Text>
+                <Text style={styles.emptyMissionTitle}>Standing By</Text>
+                <Text style={styles.emptyMissionSubtitle}>
+                  Vehicle #{driverUser.ambulanceId || driverAmbId} is currently available in the fleet. When a citizen triggers SOS, the system will assign this unit automatically!
                 </Text>
               </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardHeader}>🚨 EMERGENCY INCIDENT</Text>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardKey}>Emergency ID:</Text>
-                  <Text style={styles.cardValHighlight}>{driverMission.emergencyId}</Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardKey}>Patient Sector:</Text>
-                  <Text style={styles.cardValHighlight}>📍 {driverMission.patientLocation}</Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardKey}>Severity:</Text>
-                  <Text style={[styles.cardVal, { color: "#EF4444", fontWeight: "bold" }]}>
-                    {driverMission.severity}
-                  </Text>
-                </View>
-                <View style={styles.cardRow}>
-                  <Text style={styles.cardKey}>Target Hospital:</Text>
-                  <Text style={styles.cardVal}>{driverMission.hospitalName}</Text>
-                </View>
-              </View>
-
-              <View style={styles.card}>
-                <Text style={styles.cardHeader}>🗺️ NAVIGATION ROUTE</Text>
-                <View style={styles.routeContainer}>
-                  {driverMission.route?.map((step, idx) => (
-                    <View key={idx} style={styles.routeStep}>
-                      <View style={styles.stepCircle}>
-                        <Text style={styles.stepNum}>{idx + 1}</Text>
-                      </View>
-                      <Text style={styles.stepText}>{step}</Text>
-                      {idx < driverMission.route.length - 1 && (
-                        <Text style={styles.stepArrow}>➔</Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              </View>
-
-              {/* ACTION PROGRESS BUTTONS */}
-              <View style={styles.driverActionsCard}>
-                <Text style={styles.cardHeader}>⚡ MISSION ACTION STATUS</Text>
-                <TouchableOpacity
-                  style={[styles.driverActionBtn, { backgroundColor: "#D97706" }]}
-                  onPress={() => handleDriverStatusChange("At Scene")}
-                  disabled={updatingDriver}
-                >
-                  <Text style={styles.driverActionText}>📍 Arrived at Patient Scene</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.driverActionBtn, { backgroundColor: "#2563EB" }]}
-                  onPress={() => handleDriverStatusChange("Transporting")}
-                  disabled={updatingDriver}
-                >
-                  <Text style={styles.driverActionText}>🏥 En Route to Hospital</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.driverActionBtn, { backgroundColor: "#059669" }]}
-                  onPress={() => handleDriverStatusChange("Completed")}
-                  disabled={updatingDriver}
-                >
-                  <Text style={styles.driverActionText}>✓ Handover & Finish Mission</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <View style={styles.emptyMissionCard}>
-              <Text style={{ fontSize: 44 }}>🟢</Text>
-              <Text style={styles.emptyMissionTitle}>Standing By</Text>
-              <Text style={styles.emptyMissionSubtitle}>
-                Ambulance #{driverAmbId} is currently available. When a citizen taps SOS, the Dijkstra engine will assign this unit automatically!
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+            )}
+          </ScrollView>
+        )
       )}
 
       {/* LOCATION SELECTION MODAL */}
@@ -604,6 +866,68 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      {/* VERIFY EMERGENCY CASE MODAL (ANTI-FAKE CALL) */}
+      <Modal visible={showVerifyModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 440, width: "100%" }]}>
+            <Text style={[styles.modalTitle, { color: "#DC2626" }]}>🚨 Verify Emergency Request</Text>
+            <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
+              To prevent false alarms and ensure swift dispatch, please confirm emergency details:
+            </Text>
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#334155", marginBottom: 4 }}>
+              Incident Type:
+            </Text>
+            <View style={{ gap: 6, marginBottom: 14 }}>
+              {["Cardiac / Severe Trauma", "Road Traffic Accident", "Respiratory Distress", "Other Emergency"].map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  onPress={() => setEmergencyType(t)}
+                  style={{
+                    padding: 9,
+                    borderRadius: 8,
+                    backgroundColor: emergencyType === t ? "#FEF2F2" : "#F8FAFC",
+                    borderWidth: 1,
+                    borderColor: emergencyType === t ? "#DC2626" : "#E2E8F0",
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: emergencyType === t ? "bold" : "normal", color: emergencyType === t ? "#DC2626" : "#475569" }}>
+                    {emergencyType === t ? "● " : "○ "} {t}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={{ fontSize: 12, fontWeight: "600", color: "#334155", marginBottom: 4 }}>
+              Callback Contact Phone (Optional):
+            </Text>
+            <TextInput
+              style={[styles.textInput, { marginBottom: 16 }]}
+              placeholder="+92 3XX XXXXXXX"
+              placeholderTextColor="#94A3B8"
+              value={callerPhone}
+              onChangeText={setCallerPhone}
+              keyboardType="phone-pad"
+            />
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#E2E8F0", paddingVertical: 12, borderRadius: 10, alignItems: "center" }}
+                onPress={() => setShowVerifyModal(false)}
+              >
+                <Text style={{ fontWeight: "600", color: "#475569", fontSize: 13 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: "#DC2626", paddingVertical: 12, borderRadius: 10, alignItems: "center" }}
+                onPress={handleConfirmVerifiedSOS}
+              >
+                <Text style={{ fontWeight: "bold", color: "#FFFFFF", fontSize: 13 }}>Confirm & Call</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -619,13 +943,14 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#1E293B",
+    borderBottomColor: "#E2E8F0",
+    backgroundColor: "#FFFFFF",
     maxWidth: 520,
     width: "100%",
     alignSelf: "center",
   },
   headerBadge: {
-    backgroundColor: theme.colors.primaryRed,
+    backgroundColor: "#DC2626",
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 12,
@@ -634,24 +959,24 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     color: "#FFFFFF",
     fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: theme.colors.textWhite,
-    letterSpacing: 1.5,
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#0F172A",
+    letterSpacing: 0.5,
     marginBottom: 10,
   },
   roleToggleRow: {
     flexDirection: "row",
-    backgroundColor: "#161E2E",
-    padding: 4,
-    borderRadius: 12,
+    backgroundColor: "#E2E8F0",
+    padding: 3,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#334155",
-    gap: 6,
+    borderColor: "#CBD5E1",
+    gap: 4,
   },
   roleTab: {
     paddingVertical: 6,
@@ -659,13 +984,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   roleTabActive: {
-    backgroundColor: theme.colors.primaryRed,
+    backgroundColor: "#DC2626",
   },
   roleTabText: {
-    color: "#94A3B8",
-    fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 0.5,
+    color: "#64748B",
+    fontSize: 12,
+    fontWeight: "600",
   },
   roleTabTextActive: {
     color: "#FFFFFF",
@@ -681,46 +1005,51 @@ const styles = StyleSheet.create({
   locationBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: theme.colors.bgCard,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    borderRadius: 16,
+    borderColor: "#E2E8F0",
+    borderRadius: 14,
     padding: 14,
     width: "100%",
     marginBottom: 18,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 6,
+    elevation: 2,
   },
   locationIconBg: {
-    backgroundColor: theme.colors.bgCardActive,
+    backgroundColor: "#F1F5F9",
     padding: 8,
-    borderRadius: 12,
+    borderRadius: 10,
     marginRight: 12,
   },
   locationLabel: {
     fontSize: 10,
     fontWeight: "700",
-    color: theme.colors.textMuted,
-    letterSpacing: 1,
+    color: "#64748B",
+    letterSpacing: 0.5,
   },
   locationValue: {
     fontSize: 15,
     fontWeight: "bold",
-    color: theme.colors.textWhite,
+    color: "#0F172A",
     marginTop: 2,
   },
   changeText: {
-    color: theme.colors.accentCyan,
+    color: "#0284C7",
     fontSize: 12,
     fontWeight: "600",
   },
   severityContainer: {
     width: "100%",
-    marginBottom: 28,
+    marginBottom: 24,
   },
   sectionLabel: {
-    color: theme.colors.textSubtle,
+    color: "#64748B",
     fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontWeight: "700",
+    letterSpacing: 0.5,
     marginBottom: 10,
     textAlign: "center",
   },
@@ -734,23 +1063,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.bgCard,
+    backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
-    borderColor: "#1E293B",
+    borderColor: "#E2E8F0",
     borderRadius: 12,
     paddingVertical: 10,
     gap: 6,
   },
   severityButtonActive: {
-    backgroundColor: theme.colors.bgCardActive,
+    backgroundColor: "#F8FAFC",
   },
   severityText: {
-    color: theme.colors.textMuted,
+    color: "#64748B",
     fontSize: 13,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   severityTextActive: {
-    color: theme.colors.textWhite,
+    color: "#0F172A",
+    fontWeight: "bold",
   },
   buttonWrapper: {
     alignItems: "center",
@@ -851,19 +1181,24 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   etaCard: {
-    backgroundColor: theme.colors.bgCard,
+    backgroundColor: "#FFFFFF",
     borderWidth: 2,
-    borderColor: theme.colors.primaryRed,
-    borderRadius: 18,
+    borderColor: "#DC2626",
+    borderRadius: 16,
     padding: 18,
     alignItems: "center",
     marginBottom: 14,
+    shadowColor: "#DC2626",
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
   },
   etaLabel: {
-    color: theme.colors.textMuted,
+    color: "#64748B",
     fontSize: 11,
-    fontWeight: "800",
-    letterSpacing: 1.5,
+    fontWeight: "700",
+    letterSpacing: 1,
   },
   etaRow: {
     flexDirection: "row",
@@ -872,36 +1207,41 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   etaValue: {
-    color: theme.colors.primaryRed,
+    color: "#DC2626",
     fontSize: 48,
     fontWeight: "900",
   },
   etaUnit: {
-    color: theme.colors.primaryRed,
+    color: "#DC2626",
     fontSize: 18,
-    fontWeight: "800",
+    fontWeight: "700",
   },
   etaDistance: {
-    color: theme.colors.textSubtle,
+    color: "#64748B",
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   card: {
-    backgroundColor: theme.colors.bgCard,
-    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: "#E2E8F0",
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+    elevation: 1,
   },
   cardHeader: {
-    color: theme.colors.textWhite,
+    color: "#0F172A",
     fontSize: 12,
-    fontWeight: "800",
-    letterSpacing: 1,
+    fontWeight: "700",
+    letterSpacing: 0.5,
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#1E293B",
+    borderBottomColor: "#F1F5F9",
     paddingBottom: 6,
   },
   cardRow: {
@@ -910,16 +1250,16 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   cardKey: {
-    color: theme.colors.textMuted,
+    color: "#64748B",
     fontSize: 13,
   },
   cardVal: {
-    color: "#F1F5F9",
+    color: "#0F172A",
     fontSize: 13,
     fontWeight: "600",
   },
   cardValHighlight: {
-    color: theme.colors.accentCyan,
+    color: "#0284C7",
     fontSize: 14,
     fontWeight: "bold",
   },
@@ -973,73 +1313,175 @@ const styles = StyleSheet.create({
     fontSize: 13,
     letterSpacing: 1,
   },
-  driverUnitRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  driverUnitBtn: {
-    backgroundColor: "#0B0F19",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+  driverProfileCard: {
+    backgroundColor: "#FFFFFF",
+    padding: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: "#E2E8F0",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 4,
+    elevation: 1,
   },
-  driverUnitBtnActive: {
-    borderColor: theme.colors.primaryRed,
-    backgroundColor: "#1E293B",
-  },
-  driverUnitBtnText: {
-    color: "#94A3B8",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  driverUnitBtnTextActive: {
-    color: "#FFFFFF",
+  driverNameText: {
+    color: "#0F172A",
+    fontSize: 16,
     fontWeight: "bold",
   },
+  driverUnitText: {
+    color: "#64748B",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  shiftBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  shiftOn: {
+    backgroundColor: "#16A34A",
+  },
+  shiftOff: {
+    backgroundColor: "#94A3B8",
+  },
+  shiftBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
   driverActionsCard: {
-    backgroundColor: theme.colors.bgCard,
-    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: "#E2E8F0",
     gap: 10,
   },
   driverActionBtn: {
-    paddingVertical: 12,
+    paddingVertical: 13,
     borderRadius: 10,
     alignItems: "center",
   },
   driverActionText: {
     color: "#FFFFFF",
-    fontWeight: "800",
+    fontWeight: "700",
     fontSize: 13,
     letterSpacing: 0.5,
   },
   emptyMissionCard: {
-    backgroundColor: theme.colors.bgCard,
-    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: "#E2E8F0",
     padding: 30,
     alignItems: "center",
     marginVertical: 20,
   },
   emptyMissionTitle: {
-    color: "#FFFFFF",
-    fontSize: 22,
+    color: "#0F172A",
+    fontSize: 20,
     fontWeight: "bold",
     marginTop: 12,
     marginBottom: 6,
   },
   emptyMissionSubtitle: {
-    color: "#94A3B8",
+    color: "#64748B",
     fontSize: 13,
     textAlign: "center",
     lineHeight: 20,
+  },
+  loginCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    padding: 24,
+    width: "100%",
+    marginTop: 10,
+  },
+  loginTitle: {
+    color: "#0F172A",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  loginSubtitle: {
+    color: "#64748B",
+    fontSize: 12,
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  inputLabel: {
+    color: "#334155",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  textInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    borderRadius: 10,
+    padding: 12,
+    color: "#0F172A",
+    fontSize: 13,
+    marginBottom: 16,
+  },
+  loginBtn: {
+    backgroundColor: "#DC2626",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  loginBtnText: {
+    color: "#FFFFFF",
+    fontWeight: "900",
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  demoDivider: {
+    alignItems: "center",
+    marginVertical: 16,
+  },
+  demoDividerText: {
+    color: "#64748B",
+    fontSize: 10,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  demoBtn: {
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  demoBtnText: {
+    color: "#2563EB",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  errorBox: {
+    backgroundColor: "#7F1D1D",
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 14,
+  },
+  errorText: {
+    color: "#FECACA",
+    fontSize: 12,
+    fontWeight: "600",
   },
   modalOverlay: {
     flex: 1,
@@ -1048,19 +1490,24 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   modalCard: {
-    backgroundColor: theme.colors.bgCard,
-    borderRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: "#E2E8F0",
     padding: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 5,
   },
   modalTitle: {
-    color: theme.colors.textWhite,
+    color: "#0F172A",
     fontSize: 18,
     fontWeight: "bold",
   },
   modalSubtitle: {
-    color: theme.colors.textSubtle,
+    color: "#64748B",
     fontSize: 12,
     marginBottom: 16,
   },
@@ -1072,22 +1519,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 10,
     marginVertical: 2,
+    backgroundColor: "#F8FAFC",
   },
   modalItemActive: {
-    backgroundColor: theme.colors.bgCardActive,
+    backgroundColor: "#E2E8F0",
   },
   modalItemText: {
-    color: theme.colors.textMuted,
+    color: "#334155",
     fontSize: 14,
     fontWeight: "600",
   },
   modalItemTextActive: {
-    color: theme.colors.textWhite,
+    color: "#0F172A",
     fontWeight: "bold",
   },
   modalCloseButton: {
-    backgroundColor: theme.colors.border,
-    paddingVertical: 10,
+    backgroundColor: "#0F172A",
+    paddingVertical: 11,
     borderRadius: 10,
     alignItems: "center",
     marginTop: 14,

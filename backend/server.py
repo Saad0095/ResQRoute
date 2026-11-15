@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import math
 from typing import List, Dict, Any, Optional
@@ -6,25 +7,30 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-try:
-    from dsa.graph import CityGraph, build_default_city_map
-    from dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
-    from models import (
-        AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse,
-        RoadToggleRequest, DriverStatusUpdate
-    )
-except ImportError:
-    from backend.dsa.graph import CityGraph, build_default_city_map
-    from backend.dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
-    from backend.models import (
-        AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse,
-        RoadToggleRequest, DriverStatusUpdate
-    )
+# Ensure both backend/ and project root are in sys.path
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(backend_dir)
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
+from dsa.graph import CityGraph, build_default_city_map
+from dsa.priority_queue import EmergencyPriorityQueue, TriageEmergency
+from models import (
+    AmbulanceModel, HospitalModel, SOSRequest, DispatchResponse,
+    RoadToggleRequest, DriverStatusUpdate
+)
+from database.seed import init_and_seed_db
+from database.connection import SessionLocal
+from database.models_db import IncidentDB
+from routers.auth import router as auth_router
+from routers.admin import router as admin_router
 
 app = FastAPI(
     title="ResQRoute Intelligent Emergency Dispatch API",
-    description="Backend DSA Engine combining Priority Queue Triage with Dijkstra's Shortest Path Routing.",
-    version="2.1.0"
+    description="Enterprise Backend DSA Engine combining Priority Queue Triage with Dijkstra's Shortest Path Routing.",
+    version="3.0.0"
 )
 
 # Enable CORS for Mobile App and Web clients
@@ -35,6 +41,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount Auth router
+app.include_router(auth_router)
+
+# Mount Admin router
+app.include_router(admin_router)
+
+# Initialize and seed database tables
+init_and_seed_db()
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
@@ -234,6 +249,30 @@ def trigger_sos(request: SOSRequest):
     )
 
     dispatch_history.append(result.dict())
+
+    # Persist incident to database
+    try:
+        db = SessionLocal()
+        import json
+        incident = IncidentDB(
+            emergency_id=emergency_id,
+            patient_name=request.patientName,
+            location=patient_loc,
+            severity=request.severity,
+            severity_label=sev_label,
+            ambulance_id=best_ambulance.id if best_ambulance else None,
+            hospital_id=best_hospital.id if best_hospital else None,
+            route_json=json.dumps(best_amb_path + (best_hosp_path[1:] if best_hosp_path else [])),
+            distance_km=total_dist,
+            eta_minutes=total_eta,
+            status="Dispatched"
+        )
+        db.add(incident)
+        db.commit()
+        db.close()
+    except Exception as e:
+        print(f"[WARN] Could not persist incident: {e}")
+
     return result
 
 
@@ -257,10 +296,25 @@ def update_ambulance_status(amb_id: int, req: DriverStatusUpdate):
     for amb in ambulances:
         if amb.id == amb_id:
             amb.status = req.status
+            mission_id = amb.currentMission.get("emergencyId") if amb.currentMission else None
+            
             if req.status in ["Completed", "Available"]:
                 amb.isAvailable = True
                 amb.status = "Available"
                 amb.currentMission = None
+
+            # Sync progress back to database Incident record
+            if mission_id:
+                try:
+                    db = SessionLocal()
+                    inc = db.query(IncidentDB).filter(IncidentDB.emergency_id == mission_id).first()
+                    if inc:
+                        inc.status = req.status
+                        db.commit()
+                    db.close()
+                except Exception as e:
+                    print(f"[WARN] Incident status update failed: {e}")
+
             return {
                 "success": True,
                 "ambulanceId": amb.id,
@@ -274,3 +328,31 @@ def update_ambulance_status(amb_id: int, req: DriverStatusUpdate):
 def reset_system():
     init_default_records()
     return {"success": True, "message": "System reset to default state. All ambulances available and beds restored."}
+
+
+@app.get("/api/incidents")
+def get_incidents():
+    """Retrieve all persisted dispatch incidents from the database."""
+    try:
+        db = SessionLocal()
+        incidents = db.query(IncidentDB).order_by(IncidentDB.created_at.desc()).limit(50).all()
+        result = []
+        for i in incidents:
+            result.append({
+                "id": i.id,
+                "emergencyId": i.emergency_id,
+                "patientName": i.patient_name,
+                "location": i.location,
+                "severity": i.severity,
+                "severityLabel": i.severity_label,
+                "ambulanceId": i.ambulance_id,
+                "hospitalId": i.hospital_id,
+                "distanceKm": i.distance_km,
+                "etaMinutes": i.eta_minutes,
+                "status": i.status,
+                "createdAt": i.created_at,
+            })
+        db.close()
+        return {"incidents": result, "total": len(result)}
+    except Exception as e:
+        return {"incidents": [], "total": 0, "error": str(e)}

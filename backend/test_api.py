@@ -22,11 +22,29 @@ def test_full_system():
     assert r.status_code == 200
     print("[PASS] 1. System reset successfully.")
 
-    # 2. Check Dashboard HTML serving
+    # 2. Test JWT Authentication & Login
+    login_res = client.post("/api/auth/login", json={
+        "email": "dispatcher@resqroute.org",
+        "password": "admin123"
+    })
+    assert login_res.status_code == 200
+    auth_data = login_res.json()
+    assert "accessToken" in auth_data
+    assert auth_data["user"]["role"] == "DISPATCHER"
+    token = auth_data["accessToken"]
+    print(f"[PASS] 2. JWT Authentication passed for {auth_data['user']['email']} (Role: {auth_data['user']['role']}).")
+
+    # 3. Test Protected Profile Route
+    me_res = client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me_res.status_code == 200
+    assert me_res.json()["email"] == "dispatcher@resqroute.org"
+    print("[PASS] 3. Protected /api/auth/me verified.")
+
+    # 4. Check Dashboard HTML serving
     dash_resp = client.get("/")
     assert dash_resp.status_code == 200
     assert "Control Room" in dash_resp.text
-    print("[PASS] 2. Control Room Web Dashboard serving validated.")
+    print("[PASS] 4. Control Room Web Dashboard serving validated.")
 
     # 3. Simulate Normal Dispatch from Gulshan
     sos_payload = {

@@ -51,3 +51,10 @@ tempCodeRunnerFile.cpp
 # OS files
 .DS_Store
 Thumbs.db
+
+# Database
+backend/database/*.db
+*.sqlite3
+
+# Package locks (optional, keep or remove as needed)
+package-lock.json

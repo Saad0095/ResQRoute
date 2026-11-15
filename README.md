@@ -1,232 +1,189 @@
-# 🚑 ResQRoute
+# 🚑 ResQRoute — Intelligent Emergency Routing & Ambulance Dispatch
 
-## Intelligent Emergency Routing & Ambulance Dispatch
+> **Enterprise-Grade Emergency Dispatch System** combining real-time DSA algorithms (Dijkstra's Shortest Path + Max-Heap Priority Queue) with full-stack JWT-authenticated multi-role architecture.
 
-> **When every second matters, which ambulance should respond, which route
-> should it take, and which hospital should receive the emergency?**
+## 🏗️ Architecture
 
-ResQRoute is a university **Data Structures and Algorithms project in C++**
-that explores these decisions through a simulated city and a menu-driven
-emergency dispatch workflow.
-
-![Status](https://img.shields.io/badge/status-working%20console%20application-blue)
-![Language](https://img.shields.io/badge/language-C%2B%2B17-00599C)
-![Focus](https://img.shields.io/badge/focus-Data%20Structures%20%26%20Algorithms-orange)
-
-> **Current milestone:** The console application manages ambulances, hospitals,
-> and emergency requests using C++ STL containers.
-
----
-
-## 🎯 The challenge
-
-Imagine a small city with:
-
-- 🚨 Several emergency requests with different urgency levels
-- 🚑 Ambulances in different locations and availability states
-- 🏥 Hospitals with different capacities or suitability
-- 🛣️ Roads with different travel distances
-- 🚧 Road closures that change the available routes
-
-A useful dispatch system must make several decisions quickly instead of
-checking every possibility manually. ResQRoute turns that scenario into a
-clear, educational DSA problem:
-
-```text
-Emergency request
-        │
-        ▼
-Prioritize the request
-        │
-        ▼
-Select a suitable ambulance
-        │
-        ▼
-Find an efficient route
-        │
-        ▼
-Choose a suitable hospital
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         ResQRoute System                                │
+├──────────────┬──────────────┬──────────────┬────────────────────────────┤
+│  📱 Mobile   │  🖥️ Web App  │  🔧 Backend  │  💾 Database               │
+│  (Expo/RN)   │  (React+Vite)│  (FastAPI)   │  (SQLite + SQLAlchemy)     │
+├──────────────┼──────────────┼──────────────┼────────────────────────────┤
+│ • Citizen SOS│ • Control    │ • JWT Auth   │ • users (RBAC)             │
+│   one-tap    │   Room       │ • RBAC       │ • ambulances               │
+│ • Driver HUD │ • Admin Panel│ • Dijkstra   │ • hospitals                │
+│   (auth'd)   │ • City Map   │ • Max-Heap   │ • incidents                │
+│ • Offline    │ • Fleet Mgmt │ • Full CRUD  │                            │
+│   fallback   │ • Triage Q   │ • Road Graph │                            │
+└──────────────┴──────────────┴──────────────┴────────────────────────────┘
 ```
 
-Everything is simulated for learning. There is no live GPS, real-time traffic,
-external map service, patient-record system, or production emergency
-integration.
+## 📂 Project Structure
 
-## 🌟 Project goals
-
-ResQRoute demonstrates how the right data structure or algorithm can make each
-dispatch decision more organized and efficient:
-
-1. Store and display ambulance records.
-2. Store and display hospital records.
-3. Register emergency requests with severity levels.
-4. Prioritize emergencies using a priority queue.
-5. Assign an available ambulance to the highest-priority pending emergency.
-6. Update ambulance availability after processing an emergency.
-
-## 🧠 DSA toolkit
-
-| DSA concept | Role in ResQRoute |
-| --- | --- |
-| **Priority queue / heap** | Processes urgent requests and candidate ambulances |
-| **Vector** | Stores ambulances and hospitals |
-| **Linear search** | Finds ambulances by ID and available ambulances |
-| **STL algorithms** | Uses `find_if` for record lookup |
-
-These concepts are included only where they naturally fit the problem. The
-project is focused on the agreed DSA scope rather than adding unrelated
-features or frameworks.
-
-## 🗺️ Current dispatch flow
-
-```text
-┌──────────────────────┐
-│ Load sample records  │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Queue emergencies    │ ◄── highest urgency first
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Find an available    │
-│ ambulance            │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Assign the ambulance │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Remove the emergency │
-└──────────┬───────────┘
-           ▼
-┌──────────────────────┐
-│ Display dispatch     │
-└──────────────────────┘
 ```
-
-## 🚧 Development roadmap
-
-- [x] Create a modular C++ project structure
-- [x] Add emergency, ambulance, and hospital entities
-- [x] Add priority-based emergency processing (Max-Heap triage)
-- [x] Add ambulance availability updates
-- [x] Implement Dijkstra's shortest-path routing (`backend/dsa/graph.py`)
-- [x] Build REST API dispatch backend (`backend/server.py`)
-- [x] Build One-Tap SOS Mobile App with live HUD (`mobile/App.js`)
-- [ ] Add dynamic road closures and detour rerouting
-- [ ] Add map tile view in mobile app
-
-## 📁 Project structure
-
-```text
-ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch/
-├── backend/                       # Python DSA Engine & REST API
+ResQRoute/
+├── src/                    # Original C++ DSA implementation
+├── backend/                # Python FastAPI server
 │   ├── dsa/
-│   │   ├── graph.py               # City Graph (Adjacency List) & Dijkstra's Algorithm
-│   │   └── priority_queue.py      # Emergency Triage Max-Heap
-│   ├── static/
-│   │   └── dashboard.html         # Control Room Web Dashboard (Interactive City Map)
-│   ├── models.py                  # Ambulance, Hospital, Emergency schemas
-│   ├── server.py                  # FastAPI Dispatch Server
-│   ├── run_server.py              # Server launcher
-│   ├── test_api.py                # Automated DSA & API test suite
-│   └── requirements.txt
-├── mobile/                        # Cross-Platform Mobile App (React Native / Expo)
-│   ├── App.js                     # Citizen SOS Screen & Ambulance Driver HUD
-│   ├── package.json
-│   ├── app.json
-│   ├── start.js                   # Node runner (bypasses Windows path bug)
+│   │   ├── graph.py        # CityGraph + Dijkstra's algorithm
+│   │   └── priority_queue.py  # Max-Heap Emergency Priority Queue
+│   ├── database/
+│   │   ├── connection.py   # SQLAlchemy engine + session
+│   │   ├── models_db.py    # ORM models (User, Ambulance, Hospital, Incident)
+│   │   └── seed.py         # Initial data seeding
+│   ├── routers/
+│   │   ├── auth.py         # /api/auth/* (login, register, profile)
+│   │   └── admin.py        # /api/admin/* (user/fleet/hospital CRUD)
+│   ├── security.py         # bcrypt + JWT + RBAC guards
+│   ├── models.py           # Pydantic request/response schemas
+│   ├── server.py           # Main FastAPI app with all endpoints
+│   └── run_server.py       # Server launcher
+├── web/                    # React (Vite) Web Dashboard
 │   └── src/
-│       ├── api.js                 # API bridge to DSA Backend
-│       └── theme.js               # Emergency high-contrast dark theme
-├── src/                           # Original C++ Console System
-│   ├── Ambulance.h/.cpp
-│   ├── Hospital.h/.cpp
-│   ├── Emergency.h/.cpp
-│   ├── ResQRoute.h/.cpp
-│   └── main.cpp
-└── README.md
+│       ├── pages/
+│       │   ├── Login.jsx       # Auth page with demo credentials
+│       │   ├── Dashboard.jsx   # Dispatcher Control Room
+│       │   └── AdminPanel.jsx  # System Administration Console
+│       ├── components/
+│       │   ├── CityMap.jsx     # Canvas-based road graph visualization
+│       │   ├── RoadControls.jsx
+│       │   ├── TriageHeap.jsx
+│       │   ├── FleetTable.jsx
+│       │   └── HospitalCards.jsx
+│       └── services/api.js    # Authenticated API client
+└── mobile/                 # React Native / Expo mobile app
+    ├── App.js              # Multi-role app (Citizen + Driver)
+    └── src/
+        ├── api.js          # Mobile API client with offline fallback
+        └── theme.js        # Emergency dark theme
 ```
 
-## 🚀 Setup and execution
+## 🚀 Quick Start
 
-### 1. Central Control Room Web Dashboard & Backend API
-The backend serves the live **Control Room Web Dashboard** with an interactive city map, real-time road closures, and Dijkstra shortest-path calculations.
+### Prerequisites
+- **Python 3.10+** with pip
+- **Node.js 18+** with npm
+- **Expo Go** app (for mobile testing on physical device)
+
+### 1. Backend Server
 
 ```powershell
-# In the project root:
-python backend/run_server.py
+cd backend
+pip install -r requirements.txt
+python run_server.py
 ```
-- **Control Room Web Dashboard:** Open `http://localhost:8000` (or `http://localhost:8000/dashboard`)
-  - 🗺️ **Interactive City Map:** Karachi sector graph with real-time ambulance & hospital markers.
-  - ⛔ **Dynamic Road Closures:** Click any road segment to block/unblock it and watch Dijkstra reroute!
-  - 📊 **Priority Queue Visualizer:** Live triage Max-Heap table.
-  - 🚑 **Fleet & Bed Monitors:** Real-time unit availability and hospital bed tracking.
-- **Interactive Swagger API Docs:** `http://localhost:8000/docs`
 
-To run the automated DSA & dispatch test suite:
+The API starts at **http://localhost:8000**. Visit `/docs` for Swagger UI.
+
+### 2. Web Control Room
+
 ```powershell
-python backend/test_api.py
+cd web
+npm install
+node start.js          # Dev server on http://localhost:5173
+node start.js build    # Production build → web/dist/
 ```
 
-### 2. Multi-Role Mobile App (Expo)
-The mobile app provides both **Citizen One-Tap SOS** and **Ambulance Driver HUD** views.
+### 3. Mobile App
 
 ```powershell
 cd mobile
-npm start
-```
-*(Alternatively, you can run `node start.js`)*
-- Press `w` in terminal to view directly in your web browser.
-- Or scan the QR code with the free **Expo Go** app on your iPhone or Android device!
-- Use the top toggle to switch between:
-  - 📱 **Citizen SOS:** One-tap emergency call with live ETA.
-  - 🚑 **Driver HUD:** Live navigation, patient sector, and mission completion buttons.
-
-### 3. Running the Original C++ Console Application
-To compile and run the console version:
-
-```powershell
-cd "E:\University\3rd Semester\DSA\Final-Project\ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch\src"
-g++ main.cpp ResQRoute.cpp Emergency.cpp Hospital.cpp Ambulance.cpp -o ResQRoute.exe
-.\ResQRoute.exe
+npm install
+npm start              # Expo dev server
 ```
 
-Compile all five `.cpp` files because the class implementations are split
-across separate modules. Run the commands again after making source changes.
-The program then displays a menu. Enter a menu number and press **Enter**.
-Choose `0` to exit.
+Press **`w`** to open in browser, or scan the QR code with Expo Go.
 
-To compile and run the program with one command:
+## 🔐 Authentication & Roles
 
-```powershell
-cd "E:\University\3rd Semester\DSA\Final-Project\ResQRoute - Intelligent Emergency Routing & Ambulance Dispatch\src"; g++ main.cpp ResQRoute.cpp Emergency.cpp Hospital.cpp Ambulance.cpp -o ResQRoute.exe; if ($?) { .\ResQRoute.exe }
+| Role | Email | Password | Access |
+|------|-------|----------|--------|
+| **Admin** | `admin@resqroute.org` | `admin123` | Full system admin + dispatch |
+| **Dispatcher** | `dispatcher@resqroute.org` | `admin123` | Control room + admin panel |
+| **Driver 101** | `driver101@resqroute.org` | `driver123` | Mobile driver HUD |
+| **Driver 102** | `driver102@resqroute.org` | `driver123` | Mobile driver HUD |
+| **Driver 103** | `driver103@resqroute.org` | `driver123` | Mobile driver HUD |
+| **Citizen** | `citizen@resqroute.org` | `citizen123` | Mobile SOS only |
+
+## 🧠 DSA Algorithms
+
+### Dijkstra's Shortest Path Algorithm
+- **Implementation**: Adjacency list graph with weighted edges representing Karachi road network
+- **Dynamic road closures**: Toggle any road segment; Dijkstra reroutes around closures
+- **Used for**: Finding closest available ambulance and nearest hospital with capacity
+
+### Max-Heap Priority Queue (Emergency Triage)
+- **Implementation**: Python `heapq` with negated priorities for max-heap behavior
+- **Severity levels**: Critical (4) → High (3) → Medium (2) → Low (1)
+- **Guarantees**: Highest-severity emergencies are always processed first
+
+### City Graph
+7 zones (nodes) connected by 11 weighted road segments (edges):
+```
+North Karachi ←→ Nazimabad ←→ Gulshan ←→ Saddar ←→ Clifton ←→ Defense
+                                 ↕                      ↕
+                              Airport ←→ ←→ ←→ ←→ ←→ ←→
 ```
 
-If the executable is already running, close it before compiling again so that
-the compiler can replace `ResQRoute.exe`.
+## 📡 API Endpoints
 
-## 📌 Current limitations
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/login` | JWT login |
+| POST | `/api/auth/register` | Create account |
+| GET | `/api/auth/me` | Get current user profile |
 
-- Route calculation, road closures, and hospital suitability ranking are not
-  implemented yet.
-- Input assumes that numeric values are entered where requested.
-- Distances and locations are not used for route calculation yet.
-- The application has no live GPS, real-time traffic, external maps,
-  databases, APIs, authentication, or cloud deployment.
-- This is an educational console application, not a production emergency
-  service.
+### Dispatch Operations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/emergency/sos` | Trigger emergency dispatch |
+| GET | `/api/status` | System status (fleet, hospitals, queue) |
+| GET | `/api/roads` | Get road network |
+| POST | `/api/road/toggle` | Close/reopen road segment |
+| GET | `/api/ambulance/{id}/mission` | Get driver mission |
+| POST | `/api/ambulance/{id}/status` | Update ambulance status |
+| GET | `/api/incidents` | Dispatch history |
+| POST | `/api/reset` | Reset system state |
 
-## 👥 Academic project focus
+### Administration (ADMIN/DISPATCHER only)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/users` | List all users |
+| POST | `/api/admin/users` | Create user |
+| PATCH | `/api/admin/users/{id}/deactivate` | Deactivate user |
+| PATCH | `/api/admin/users/{id}/activate` | Activate user |
+| DELETE | `/api/admin/users/{id}` | Delete user (ADMIN only) |
+| GET | `/api/admin/hospitals` | List hospitals |
+| POST | `/api/admin/hospitals` | Add hospital |
+| PATCH | `/api/admin/hospitals/{id}/beds` | Update bed count |
+| GET | `/api/admin/ambulances` | List fleet |
+| POST | `/api/admin/ambulances` | Add ambulance |
 
-ResQRoute is designed as a readable, modular team project for studying
-algorithmic problem solving. Future modules should make the selected data
-structure visible, explain why it fits the decision being made, and document
-the expected time and space complexity.
+## 🎯 End-to-End Demo Flow
+
+1. **Start backend** → `python backend/run_server.py`
+2. **Open web** → Login as Dispatcher → See Control Room
+3. **Trigger SOS** → Select zone & severity → Watch Dijkstra route light up on City Map
+4. **Admin Panel** → Click "Admin Panel" button → Manage users, fleet, hospitals
+5. **Mobile Citizen** → Open Expo → Press SOS → See dispatch result with ETA
+6. **Mobile Driver** → Switch to Driver tab → Login → See mission HUD → Complete mission
+7. **Verify** → Web dashboard shows ambulance back to Available (green)
+
+## 🛠️ Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3, FastAPI, Uvicorn |
+| Auth | JWT (PyJWT), bcrypt, OAuth2 Bearer |
+| Database | SQLite + SQLAlchemy ORM |
+| Web Frontend | React 19, Vite 8, TailwindCSS, Lucide Icons |
+| Mobile | React Native, Expo SDK 51 |
+| DSA | Dijkstra (custom), Max-Heap Priority Queue |
 
 ---
 
-**ResQRoute — turning DSA concepts into life-saving decisions, one simulated
-road at a time.**
+**University:** 3rd Semester DSA Final Project  
+**Course:** Data Structures & Algorithms
