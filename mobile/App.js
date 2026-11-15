@@ -365,13 +365,13 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.colors.bgDark} />
+      <StatusBar barStyle="dark-content" backgroundColor={theme.colors.bgDark} />
 
       {/* HEADER WITH ROLE SWITCHER */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => setShowServerModal(true)}
-          style={{ position: "absolute", top: 10, right: 14, padding: 6, zIndex: 10 }}
+          style={{ position: "absolute", top: 14, right: 14, padding: 6, zIndex: 10 }}
         >
           <Text style={{ fontSize: 16 }}>⚙️</Text>
         </TouchableOpacity>
@@ -1086,12 +1086,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.bgDark,
+    paddingTop: Platform.OS === "android" ? (StatusBar.currentHeight || 28) + 10 : (Platform.OS === "web" ? 16 : 8),
     ...(Platform.OS === "web" ? { minHeight: "100vh", height: "100%", width: "100%" } : {}),
   },
   header: {
     alignItems: "center",
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingTop: 18,
+    paddingBottom: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
     backgroundColor: "#FFFFFF",
