@@ -60,52 +60,42 @@ ResQRoute/
         └── theme.js        # Emergency dark theme
 ```
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Running the System)
 
-### Prerequisites
-- **Python 3.10+** with pip
-- **Node.js 18+** with npm
-- **Expo Go** app (for mobile testing on physical device)
+Open **3 separate terminal windows** (or VS Code terminal tabs):
 
-### 1. Backend Server
-
+### Terminal 1: Backend API & Database
 ```powershell
-cd backend
-pip install -r requirements.txt
-python run_server.py
+python backend/server.py
 ```
+- **API URL**: `http://localhost:8000`
+- **Swagger Documentation**: `http://localhost:8000/docs`
 
-The API starts at **http://localhost:8000**. Visit `/docs` for Swagger UI.
-
-### 2. Web Control Room
-
+### Terminal 2: Web Dispatcher Dashboard
 ```powershell
 cd web
-npm install
-node start.js          # Dev server on http://localhost:5173
-node start.js build    # Production build → web/dist/
+node start.js
 ```
+- **Dashboard URL**: `http://localhost:5173`
 
-### 3. Mobile App
-
+### Terminal 3: Mobile App (Expo SDK 58)
 ```powershell
 cd mobile
-npm install
-npm start              # Expo dev server
+node start.js
 ```
+- **On Phone**: Open **Expo Go** and scan the QR code displayed in the terminal.
+- **In Browser**: Press **`w`** in the terminal to open the web preview at `http://localhost:8081`.
 
-Press **`w`** to open in browser, or scan the QR code with Expo Go.
+---
 
-## 🔐 Authentication & Roles
+## 🔐 Default Login Credentials
 
-| Role | Email | Password | Access |
-|------|-------|----------|--------|
-| **Admin** | `admin@resqroute.org` | `admin123` | Full system admin + dispatch |
-| **Dispatcher** | `dispatcher@resqroute.org` | `admin123` | Control room + admin panel |
-| **Driver 101** | `driver101@resqroute.org` | `driver123` | Mobile driver HUD |
-| **Driver 102** | `driver102@resqroute.org` | `driver123` | Mobile driver HUD |
-| **Driver 103** | `driver103@resqroute.org` | `driver123` | Mobile driver HUD |
-| **Citizen** | `citizen@resqroute.org` | `citizen123` | Mobile SOS only |
+| Role | Email | Password | Access Scope |
+|------|-------|----------|--------------|
+| **Admin** | `admin@resqroute.org` | `admin123` | Full control room + staff & fleet management |
+| **Dispatcher** | `dispatcher@resqroute.org` | `dispatch123` | Control room dispatch operations |
+| **Driver (#102)** | `driver102@resqroute.org` | `driver123` | Mobile vehicle HUD & mission progression |
+| **Citizen** | `citizen@resqroute.org` | `citizen123` | Mobile emergency SOS & live vehicle tracking |
 
 ## 🧠 DSA Algorithms
 
@@ -180,7 +170,7 @@ North Karachi ←→ Nazimabad ←→ Gulshan ←→ Saddar ←→ Clifton ←�
 | Auth | JWT (PyJWT), bcrypt, OAuth2 Bearer |
 | Database | SQLite + SQLAlchemy ORM |
 | Web Frontend | React 19, Vite 8, TailwindCSS, Lucide Icons |
-| Mobile | React Native, Expo SDK 51 |
+| Mobile | React Native, Expo SDK 58 |
 | DSA | Dijkstra (custom), Max-Heap Priority Queue |
 
 ---
