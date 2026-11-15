@@ -17,6 +17,8 @@ public:
     Emergency(int i = 000, string patient = "Unknown", string loc = "Karachi", int s = 1);
     int getId() const;
     int getSeverity() const;
+    string getLocation() const;
+    string getPatientName() const;
     void display();
 };
 

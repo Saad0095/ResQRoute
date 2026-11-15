@@ -14,8 +14,10 @@ private:
     bool isAvailable;
 
 public:
-    Ambulance(int i = 101, string d = "Unkown", string loc = "Karachi", bool av = false);
+    Ambulance(int i = 101, string d = "Unknown", string loc = "Karachi", bool av = false);
     int getId() const;
+    string getLocation() const;
+    void setLocation(const string &loc);
     bool getAvailibility() const;
     void updateAvailibility();
     void display() const;
