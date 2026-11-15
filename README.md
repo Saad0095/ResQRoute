@@ -179,14 +179,18 @@ When the build finishes, EAS provides a direct download link and QR code. Downlo
 
 ## 🔐 Pre-seeded User Accounts & Roles
 
-| Role | Email | Password | Permissions & Scope |
-| :--- | :--- | :--- | :--- |
-| **System Admin** | `admin@resqroute.org` | `admin123` | Full control room access, user/staff management, infrastructure reset, and ambulance/hospital creation. |
-| **Emergency Dispatcher** | `dispatcher@resqroute.org` | `admin123` | Control room operations, live map view, road closure toggles, call dispatching, and bed updates. |
-| **Ambulance Driver (#102)** | `driver102@resqroute.org` | `driver123` | Driver HUD, turn-by-turn navigation, patient arrival, and hospital handover workflow. |
-| **Registered Citizen** | `citizen@resqroute.org` | `citizen123` | Citizen emergency SOS trigger, location detection, and live vehicle tracking. |
+| Role | Driver / Staff Name | Email | Password | Stationed / Base Location | Permissions & Scope |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Emergency Dispatcher** | Control Room Dispatcher | `dispatcher@resqroute.org` | `admin123` | **📍 Central Control Room** | Control room operations, live map view, road closure toggles, call dispatching, and bed updates. |
+| **System Admin** | System Administrator | `admin@resqroute.org` | `admin123` | **📍 Central HQ Command** | Full control room access, user/staff management, infrastructure editing/deletion, and ambulance/hospital creation. |
+| **Ambulance Driver #101** | Ali Khan | `driver101@resqroute.org` | `driver123` | **📍 North Karachi** | Driver HUD, turn-by-turn navigation, patient arrival, and hospital handover workflow. |
+| **Ambulance Driver #102** | Ahmed Raza | `driver102@resqroute.org` | `driver123` | **📍 Gulshan** | Driver HUD, turn-by-turn navigation, patient arrival, and hospital handover workflow. |
+| **Ambulance Driver #103** | Usman Sheikh | `driver103@resqroute.org` | `driver123` | **📍 Nazimabad** | Driver HUD, turn-by-turn navigation, patient arrival, and hospital handover workflow. |
+| **Ambulance Driver #104** | Tariq Jameel | `driver104@resqroute.org` | `driver123` | **📍 Saddar** | Driver HUD, turn-by-turn navigation, patient arrival, and hospital handover workflow. |
+| **Ambulance Driver #105** | Hamza Qureshi | `driver105@resqroute.org` | `driver123` | **📍 Clifton** | Driver HUD, turn-by-turn navigation, patient arrival, and hospital handover workflow. |
+| **Registered Citizen** | Zain Citizen | `citizen@resqroute.org` | `citizen123` | **📍 Public Mobile Portal** | Citizen emergency SOS trigger, location detection, and live vehicle tracking. |
 
-*(All login screens include one-click **⚡ Demo Login** buttons for instant access).*
+*(All login screens on both Web and Mobile include one-click **⚡ Demo Login** buttons displaying driver base sectors for instant access).*
 
 ---
 
@@ -195,27 +199,39 @@ When the build finishes, EAS provides a direct download link and QR code. Downlo
 The system models Karachi's arterial transit corridors as a weighted, bidirectional graph:
 
 ```
-[North Karachi] ──(4km)── [Nazimabad] ──(6km)── [Gulshan] ──(5.5km)── [Shahrah-e-Faisal] ──(7km)── [Saddar]
-                                                    │                         │                         │
-                                                 (5km)                      (6km)                     (4km)
-                                                    │                         │                         │
-                                                [Airport] ───(6km)────────────┘                      [Clifton]
-                                                    │                                                   │
-                                                  (5km)                                               (5km)
-                                                    │                                                   │
-                                                 [Malir] ────(8km)─────────────────────────────────── [Defense]
+                            [Gulistan-e-Jauhar]
+                                 │         ╲(8km)
+                              (6km)         ╲
+                                 │           ▼
+[North Karachi] ──(6.5km)── [Gulshan] ──(10km)── [Airport] ──(5km)── [Malir]
+      │                        │ ╲                 │ ╲                 │
+   (6.5km)                  (8km) ╲(5.5km)       (6km) ╲(14km)       (8km)
+      │                        │   ╲               │     ╲             │
+      ▼                        ▼    ▼              ▼      ▼            ▼
+[Nazimabad] ───(7km)─────► [Saddar]  [Shahrah-e-Faisal] ──────► [Defense]
+                               │                           ▲
+                             (4km)                       (5km)
+                               │                           │
+                               ▼                           │
+                           [Clifton] ──────────────────────┘
 ```
 
 ### Key Arterial Routing
-- **Malir ⇄ Shahrah-e-Faisal ⇄ Saddar**: 
+- **Gulistan-e-Jauhar Arterial Access**:
+  - Located directly above Gulshan at coordinates `(440, 70)`.
+  - Connected to Gulshan (6.0 km) and Airport (8.0 km).
+- **Malir ⇄ Shahrah-e-Faisal ⇄ Saddar Corridor**: 
   - Malir to Shahrah-e-Faisal (8.0 km)
   - Shahrah-e-Faisal to Saddar (7.0 km)
   - Total distance: **15.0 km** (~18 min emergency transit).
-- **Dynamic Infrastructure Updates**:
-  - **Add Sector / Location**: Add custom city sectors with coordinates and automatic bidirectional link to an existing zone (`POST /api/locations`).
-  - **Connect Roads**: Draw new connecting roads with custom distance between any two sectors (`POST /api/roads`).
+- **Dynamic Infrastructure Updates & Visual Editing**:
+  - **Add Sector / Location**: Add custom city sectors with coordinates, parent artery, and placement (`POST /api/locations`).
+  - **Edit Sector & Live Drag Positioning**: Drag and drop nodes visually on an interactive map or use directional nudge buttons (`PUT /api/locations/{name}`).
+  - **Remove Sector**: Delete any sector node and automatically reassign stranded units to safe fallback sectors (`DELETE /api/locations/{name}`).
+  - **Connect Roads**: Draw new bidirectional roads with custom distances between any two sectors (`POST /api/roads`).
+  - **Disconnect Road**: Sever an existing road artery directly from the UI (`DELETE /api/roads/{u}/{v}`).
   - **Route Inspector**: Test shortest paths and ETAs dynamically between any two locations (`GET /api/route/plan`).
-  - **Road Closure & Detours**: Toggle any road segment closed to simulate traffic jams or blockages; shortest-path routing automatically reroutes around obstructed roads in real time!
+  - **Road Closure & Detours**: Toggle any road segment closed to simulate traffic jams or blockages; Dijkstra automatically computes the optimal detour in real time!
 
 ---
 
@@ -224,26 +240,33 @@ The system models Karachi's arterial transit corridors as a weighted, bidirectio
 ### 1. Web Control Room (`web/`)
 - **Real-Time Operations Overview**: KPI cards tracking Available Ambulances, Free Hospital Beds, Active Missions, and Total Calls Logged.
 - **Interactive City Canvas Map**:
-  - Live color-coded vehicle markers (`Available` in green, `At Scene` in yellow, `Transporting` in red).
-  - Hospital nodes with bed capacity indicators.
+  - High-visibility color-coded vehicle markers (`Available` in green, `At Scene` in yellow, `Transporting` in red).
+  - Hospital nodes with real-time bed capacity indicators.
+  - Isolated distance tags (`X km`) rendering with clean badge backgrounds to prevent line overlap.
   - Interactive road segments: click any road to toggle closure.
   - Active dispatch path highlighted with pulsing beacon.
   - **📋 Copy Route** button for immediate dispatch sharing.
+- **Modal Viewport & Overflow Management**:
+  - All dialogs strictly bounded (`max-h-[90vh]`) with internal scrollable bodies (`overflow-y-auto`) and sticky action buttons (`Save`, `Cancel`, `Remove`, `Disconnect`) to ensure zero screen clipping across all display sizes.
+  - Interactive visual positioning preview map enlarged to `h-64 sm:h-72` with bold 12px labels and enlarged node touchpoints.
 - **Emergency Route Navigator & Trip Inspector**: Test travel times and shortest paths between any pickup and destination in the city.
-- **Emergency Call Registration**: Dispatch closest available ambulance with automated hospital reservation based on patient severity.
+- **Emergency Call Registration**: Dispatch closest available ambulance with automated hospital reservation based on 4 severity levels (Critical, High, Medium, Low).
 - **Fleet Management & Bed Adjustments**: Live table of all units with one-click vehicle release and hospital capacity sliders.
-- **Call History Audit Trail**: Chronological incident logs with individual **📋 Copy** buttons.
+- **Persistent Call History & Audit Trail**: Chronological incident logs persisted in SQLite (`IncidentDB`) with individual **📋 Copy** buttons.
 - **Clean Emergency Service Interface**: Zero academic jargon (no "Dijkstra", "Max-Heap", or "graph" labels on user screens).
 
 ### 2. Mobile App (`mobile/`)
 - **📱 Citizen Emergency SOS**:
   - Automatic GPS sector detection via *"Locate Me"*.
-  - Anti-false alarm verification modal confirming emergency category.
+  - Dynamic sector synchronization: automatically refreshes latest sectors directly from the backend on SOS button press.
+  - Searchable and scrollable emergency zone selection modal (`🔍 Search sector...`).
+  - Anti-false alarm verification modal displaying the emergency sector with one-tap quick change option.
   - Animated pulsing SOS button.
   - Waypoint route tracker with dynamic countdown ETA.
   - One-tap **📋 Copy Emergency & Route Details** button.
 - **🚑 Driver Mission HUD**:
   - Standby HUD displaying assigned vehicle unit and stationed sector.
+  - One-click demo logins for all 5 ambulance driver units with stationed base locations on screen.
   - Polling engine receiving dispatch missions in under 2.5 seconds.
   - Step-by-step navigation directions (Station ➔ Patient ➔ Hospital).
   - Three-stage mission progression:
@@ -291,13 +314,16 @@ For academic review and evaluation:
 - `GET /api/status` — Full control room state (fleet, hospitals, call queue).
 - `GET /api/locations` — City sectors, coordinates, and stationed units.
 - `POST /api/locations` — Add new city sector dynamically.
+- `PUT /api/locations/{location_name}` — Edit sector coordinates and/or rename sector.
+- `DELETE /api/locations/{location_name}` — Remove a sector node and all its connected roads safely.
 - `GET /api/roads` — All road connections with distances and status.
 - `POST /api/roads` — Create custom bidirectional road connection.
+- `DELETE /api/roads/{u}/{v}` — Disconnect road connection between two sectors.
 - `POST /api/road/toggle` — Toggle road closure (active/closed).
 - `GET /api/route/plan?origin={A}&destination={B}` — Compute shortest path and ETA.
 - `GET /api/ambulance/{id}/mission` — Polled by mobile driver HUD.
 - `POST /api/ambulance/{id}/status` — Update driver state (`Available`, `At Scene`, `Transporting`).
-- `GET /api/incidents` — Logged dispatch history.
+- `GET /api/incidents` — Logged dispatch history from persistent SQLite database.
 - `POST /api/reset` — Reset system to initial seeded state.
 
 ### Administration (`/api/admin/*`)

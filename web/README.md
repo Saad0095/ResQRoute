@@ -49,12 +49,17 @@ The output bundle is generated inside `web/dist/`.
 
 ## 🔐 Login Credentials
 
-| Role | Email | Password | Permissions |
-| :--- | :--- | :--- | :--- |
-| **System Admin** | `admin@resqroute.org` | `admin123` | Full control room access, user/staff management, system reset, infrastructure deletion. |
-| **Emergency Dispatcher** | `dispatcher@resqroute.org` | `admin123` | Emergency call routing, real-time map, road traffic toggle, fleet status, hospital bed adjustments. |
+| Role | Name | Email | Password | Base Station / Sector | Scope |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Emergency Dispatcher** | Control Room Dispatcher | `dispatcher@resqroute.org` | `admin123` | **📍 Central Control Room** | Real-time map, call dispatching, bed updates, road closures. |
+| **System Admin** | System Administrator | `admin@resqroute.org` | `admin123` | **📍 Central HQ Command** | Full control room, staff management, sector/road creation & deletion. |
+| **Ambulance Driver #101** | Ali Khan | `driver101@resqroute.org` | `driver123` | **📍 North Karachi** | Vehicle HUD & mission navigation. |
+| **Ambulance Driver #102** | Ahmed Raza | `driver102@resqroute.org` | `driver123` | **📍 Gulshan** | Vehicle HUD & mission navigation. |
+| **Ambulance Driver #103** | Usman Sheikh | `driver103@resqroute.org` | `driver123` | **📍 Nazimabad** | Vehicle HUD & mission navigation. |
+| **Ambulance Driver #104** | Tariq Jameel | `driver104@resqroute.org` | `driver123` | **📍 Saddar** | Vehicle HUD & mission navigation. |
+| **Ambulance Driver #105** | Hamza Qureshi | `driver105@resqroute.org` | `driver123` | **📍 Clifton** | Vehicle HUD & mission navigation. |
 
-*(Quick Fill buttons are provided directly on the login page for one-click demo access).*
+*(All accounts are displayed on the login page with one-click quick-fill buttons).*
 
 ---
 

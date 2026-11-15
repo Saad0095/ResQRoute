@@ -93,14 +93,15 @@ If you wish to switch back to a local backend during offline development:
 
 To test the **Ambulance Driver HUD**:
 1. Tap the **🚑 DRIVER PORTAL** tab in the top header.
-2. Sign in with the seeded vehicle driver credentials:
+2. Select any driver with one tap or sign in manually (Password for all drivers: `driver123`):
 
-| Field | Value |
-| :--- | :--- |
-| **Email** | `driver102@resqroute.org` |
-| **Password** | `driver123` |
-| **Vehicle Unit** | Ambulance #102 |
-| **Quick Demo** | Tap the *"⚡ Demo Login: Driver #102"* button for one-click access. |
+| Vehicle Unit | Driver Name | Email | Base Station Sector |
+| :--- | :--- | :--- | :--- |
+| **Ambulance #101** | Ali Khan | `driver101@resqroute.org` | **📍 North Karachi** |
+| **Ambulance #102** | Ahmed Raza | `driver102@resqroute.org` | **📍 Gulshan** |
+| **Ambulance #103** | Usman Sheikh | `driver103@resqroute.org` | **📍 Nazimabad** |
+| **Ambulance #104** | Tariq Jameel | `driver104@resqroute.org` | **📍 Saddar** |
+| **Ambulance #105** | Hamza Qureshi | `driver105@resqroute.org` | **📍 Clifton** |
 
 ---
 
