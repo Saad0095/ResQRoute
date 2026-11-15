@@ -50,7 +50,7 @@ export default function App() {
     "Shahrah-e-Faisal",
   ]);
   const [locationCoords, setLocationCoords] = useState({});
-  const [severity, setSeverity] = useState(4); // 4 = Critical, 3 = High, 2 = Medium
+  const [severity, setSeverity] = useState(4); // 4 = Critical, 3 = High, 2 = Medium, 1 = Low
   const [loading, setLoading] = useState(false);
   const [dispatchResult, setDispatchResult] = useState(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -579,9 +579,10 @@ export default function App() {
               <Text style={styles.sectionLabel}>EMERGENCY SEVERITY LEVEL</Text>
               <View style={styles.severityRow}>
                 {[
-                  { level: 4, label: "Critical", icon: "🚨" },
-                  { level: 3, label: "High", icon: "⚠️" },
-                  { level: 2, label: "Medium", icon: "🩹" },
+                  { level: 4, label: "Critical", icon: "🚨", color: theme.colors.primaryRed },
+                  { level: 3, label: "High", icon: "⚠️", color: theme.colors.warningAmber },
+                  { level: 2, label: "Medium", icon: "🩹", color: theme.colors.accentCyan },
+                  { level: 1, label: "Low", icon: "🟢", color: "#10B981" },
                 ].map((item) => (
                   <TouchableOpacity
                     key={item.level}
@@ -589,22 +590,19 @@ export default function App() {
                       styles.severityButton,
                       severity === item.level && styles.severityButtonActive,
                       severity === item.level && {
-                        borderColor:
-                          item.level === 4
-                            ? theme.colors.primaryRed
-                            : item.level === 3
-                            ? theme.colors.warningAmber
-                            : theme.colors.accentCyan,
+                        borderColor: item.color,
+                        backgroundColor: item.color + "12",
                       },
                     ]}
                     onPress={() => setSeverity(item.level)}
                     activeOpacity={0.7}
                   >
-                    <Text style={{ fontSize: 16 }}>{item.icon}</Text>
+                    <Text style={{ fontSize: 13 }}>{item.icon}</Text>
                     <Text
                       style={[
                         styles.severityText,
                         severity === item.level && styles.severityTextActive,
+                        severity === item.level && { color: item.color },
                       ]}
                     >
                       {item.label}
@@ -1748,7 +1746,7 @@ const styles = StyleSheet.create({
   severityRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    gap: 6,
   },
   severityButton: {
     flex: 1,
@@ -1758,9 +1756,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1.5,
     borderColor: "#E2E8F0",
-    borderRadius: 12,
-    paddingVertical: 10,
-    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    gap: 4,
     ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   severityButtonActive: {
@@ -1768,7 +1767,7 @@ const styles = StyleSheet.create({
   },
   severityText: {
     color: "#64748B",
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: "600",
   },
   severityTextActive: {
