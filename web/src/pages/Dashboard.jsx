@@ -16,8 +16,6 @@ import {
   fetchAdminAmbulances,
   createAmbulance,
   fetchIncidents,
-  deleteIncident,
-  clearIncidents,
   addLocation,
   updateLocation,
   deleteLocation,
@@ -122,23 +120,23 @@ export default function Dashboard({ user, onLogout }) {
 
   const loadData = async () => {
     try {
-      const [statusData, roadsData, incData] = await Promise.all([
+      const [statusData, roadsData] = await Promise.all([
         fetchSystemStatus(),
         fetchRoads(),
-        fetchIncidents().catch(() => ({ incidents: [] })),
       ]);
       setState({ ...statusData, roads: roadsData.roads });
-      setIncidents(incData.incidents || []);
 
       if (user.role === "ADMIN" || user.role === "DISPATCHER") {
-        const [u, h, a] = await Promise.all([
+        const [u, h, a, inc] = await Promise.all([
           fetchUsers().catch(() => []),
           fetchAdminHospitals().catch(() => []),
           fetchAdminAmbulances().catch(() => []),
+          fetchIncidents().catch(() => ({ incidents: [] })),
         ]);
         setUsersList(u);
         setHospitalsList(h);
         setAmbulancesList(a);
+        setIncidents(inc.incidents || []);
       }
     } catch (err) {
       console.error(err);
@@ -425,6 +423,19 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
+  const handleDeleteRoad = async (u, v) => {
+    if (!u || !v) return;
+    if (!window.confirm(`Disconnect arterial road between ${u} and ${v}?`)) return;
+    try {
+      await deleteRoad(u, v);
+      showMsg(`Road between ${u} ⇄ ${v} disconnected.`);
+      setShowAddRoad(false);
+      await loadData();
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
   const handleUpdateLocation = async (e) => {
     e.preventDefault();
     if (!editLocation.selected) {
@@ -445,53 +456,13 @@ export default function Dashboard({ user, onLogout }) {
     }
   };
 
-  const handleDeleteLocation = async (locName) => {
-    const target = locName || editLocation.selected;
-    if (!target) return;
-    if (!window.confirm(`Are you sure you want to remove sector "${target}" from the city network? All connecting roads will be removed.`)) {
-      return;
-    }
+  const handleDeleteLocation = async (locationName) => {
+    if (!locationName) return;
+    if (!window.confirm(`Are you sure you want to remove sector "${locationName}" and its connected roads?`)) return;
     try {
-      await deleteLocation(target);
-      showMsg(`Sector "${target}" removed successfully!`);
+      await deleteLocation(locationName);
+      showMsg(`Sector "${locationName}" removed successfully.`);
       setShowEditLocation(false);
-      await loadData();
-    } catch (err) {
-      showMsg(err.message, true);
-    }
-  };
-
-  const handleDeleteRoad = async (u, v) => {
-    if (!u || !v) return;
-    if (!window.confirm(`Are you sure you want to disconnect the road between ${u} ⇄ ${v}?`)) {
-      return;
-    }
-    try {
-      await deleteRoad(u, v);
-      showMsg(`Road between ${u} ⇄ ${v} disconnected!`);
-      setShowAddRoad(false);
-      await loadData();
-    } catch (err) {
-      showMsg(err.message, true);
-    }
-  };
-
-  const handleDeleteIncident = async (id, emergencyId) => {
-    if (!window.confirm(`Delete record for call ${emergencyId}?`)) return;
-    try {
-      await deleteIncident(id);
-      showMsg(`Emergency call record ${emergencyId} deleted!`);
-      await loadData();
-    } catch (err) {
-      showMsg(err.message, true);
-    }
-  };
-
-  const handleClearAllIncidents = async () => {
-    if (!window.confirm("Are you sure you want to clear all call history records? This cannot be undone.")) return;
-    try {
-      await clearIncidents();
-      showMsg("All call history records cleared!");
       await loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -645,29 +616,29 @@ export default function Dashboard({ user, onLogout }) {
     },
     ...(user.role === "ADMIN"
       ? [
-          {
-            id: "users",
-            label: "Users",
-            icon: (
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-            ),
-          },
-          {
-            id: "settings",
-            label: "Settings",
-            icon: (
-              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="3"></circle>
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-              </svg>
-            ),
-          },
-        ]
+        {
+          id: "users",
+          label: "Users",
+          icon: (
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+          ),
+        },
+        {
+          id: "settings",
+          label: "Settings",
+          icon: (
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          ),
+        },
+      ]
       : []),
   ];
 
@@ -733,9 +704,8 @@ export default function Dashboard({ user, onLogout }) {
       <div className="flex flex-1 overflow-hidden">
         {/* Sleek Toggled Sidebar Navigation */}
         <aside
-          className={`${
-            sidebarOpen ? "w-56" : "w-16"
-          } transition-all duration-200 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between p-2.5 shrink-0 z-10`}
+          className={`${sidebarOpen ? "w-56" : "w-16"
+            } transition-all duration-200 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between p-2.5 shrink-0 z-10`}
         >
           <nav className="space-y-1">
             {tabs.map((tab) => {
@@ -745,11 +715,10 @@ export default function Dashboard({ user, onLogout }) {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   title={!sidebarOpen ? tab.label : undefined}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${
-                    active
-                      ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-semibold shadow-sm"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
-                  } ${!sidebarOpen ? "justify-center px-0" : ""}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition ${active
+                    ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-semibold shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
+                    } ${!sidebarOpen ? "justify-center px-0" : ""}`}
                 >
                   {tab.icon}
                   {sidebarOpen && <span className="truncate">{tab.label}</span>}
@@ -788,11 +757,10 @@ export default function Dashboard({ user, onLogout }) {
           {/* Status Notification Banner */}
           {notice && (
             <div
-              className={`mb-5 p-3 rounded-lg border text-xs flex items-center justify-between ${
-                notice.isError
-                  ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900 text-red-700 dark:text-red-300"
-                  : "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300"
-              }`}
+              className={`mb-5 p-3 rounded-lg border text-xs flex items-center justify-between ${notice.isError
+                ? "bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900 text-red-700 dark:text-red-300"
+                : "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300"
+                }`}
             >
               <span>{notice.text}</span>
               <button onClick={() => setNotice(null)} className="text-xs opacity-60 hover:opacity-100 ml-4">✕</button>
@@ -879,13 +847,12 @@ export default function Dashboard({ user, onLogout }) {
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-xs text-slate-900 dark:text-white">Ambulance #{amb.id}</span>
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              amb.status === "At Scene"
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                                : amb.status === "Transporting"
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${amb.status === "At Scene"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                              : amb.status === "Transporting"
                                 ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
                                 : "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
-                            }`}
+                              }`}
                           >
                             ● {amb.status || "Dispatched"}
                           </span>
@@ -1168,7 +1135,6 @@ export default function Dashboard({ user, onLogout }) {
               <RoadControls
                 roads={state?.roads}
                 onToggleRoad={handleToggleRoad}
-                onDeleteRoad={handleDeleteRoad}
               />
             </div>
           )}
@@ -1332,19 +1298,9 @@ export default function Dashboard({ user, onLogout }) {
           {/* 6. CALL HISTORY PAGE */}
           {activeTab === "history" && (
             <div className="w-full space-y-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">Call History</h1>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Chronological record of emergency dispatches and live field status (Persisted in Database)</p>
-                </div>
-                {incidents.length > 0 && (
-                  <button
-                    onClick={handleClearAllIncidents}
-                    className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-medium transition flex items-center gap-1.5"
-                  >
-                    <span>🗑️</span> Clear Call History
-                  </button>
-                )}
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 dark:text-white">Call History</h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Chronological record of emergency dispatches and live field status</p>
               </div>
 
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
@@ -1359,7 +1315,6 @@ export default function Dashboard({ user, onLogout }) {
                       <th className="px-4 py-3">Distance</th>
                       <th className="px-4 py-3">ETA</th>
                       <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1394,31 +1349,21 @@ export default function Dashboard({ user, onLogout }) {
                         <td className="px-4 py-3 font-medium">{inc.etaMinutes} mins</td>
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                              inc.status === "Completed"
-                                ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
-                                : inc.status === "At Scene"
+                            className={`px-2 py-0.5 rounded text-[11px] font-semibold ${inc.status === "Completed"
+                              ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400"
+                              : inc.status === "At Scene"
                                 ? "bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400"
                                 : "bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400"
-                            }`}
+                              }`}
                           >
                             {inc.status}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <button
-                            onClick={() => handleDeleteIncident(inc.id, inc.emergencyId)}
-                            title="Delete Call Record"
-                            className="p-1 text-slate-400 hover:text-red-600 transition"
-                          >
-                            🗑️
-                          </button>
                         </td>
                       </tr>
                     ))}
                     {incidents.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="text-center py-8 text-slate-400">
+                        <td colSpan={8} className="text-center py-8 text-slate-400">
                           No emergency calls recorded yet.
                         </td>
                       </tr>
@@ -1544,9 +1489,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* ================= MODAL 1: ADD AMBULANCE ================= */}
       {showAddAmbulance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/60 text-red-600 flex items-center justify-center text-sm font-bold">
                   🚑
@@ -1564,7 +1509,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateAmbulance} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateAmbulance} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Vehicle ID *</label>
@@ -1702,7 +1647,7 @@ export default function Dashboard({ user, onLogout }) {
                 </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <button
                   type="button"
                   onClick={() => setShowAddAmbulance(false)}
@@ -1724,9 +1669,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* ================= MODAL 2: ADD HOSPITAL ================= */}
       {showAddHospital && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center text-sm font-bold">
                   🏥
@@ -1744,7 +1689,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateHospital} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateHospital} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Hospital Name *</label>
@@ -1886,7 +1831,7 @@ export default function Dashboard({ user, onLogout }) {
                 </span>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <button
                   type="button"
                   onClick={() => setShowAddHospital(false)}
@@ -1908,9 +1853,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* ================= MODAL 3: ADD USER ================= */}
       {showAddUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center text-sm font-bold">
                   👤
@@ -1928,7 +1873,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateUser} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Full Name *</label>
@@ -2002,7 +1947,7 @@ export default function Dashboard({ user, onLogout }) {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <button
                   type="button"
                   onClick={() => setShowAddUser(false)}
@@ -2024,9 +1969,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* ================= MODAL 4: EDIT HOSPITAL BEDS ================= */}
       {editBedModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center text-sm font-bold">
                   🛏️
@@ -2044,7 +1989,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleSaveBedModal} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleSaveBedModal} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               <div className="space-y-3">
                 <div>
                   <label className="block text-slate-700 dark:text-slate-300 font-medium mb-1.5">Free / Available Beds *</label>
@@ -2071,7 +2016,7 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <button
                   type="button"
                   onClick={() => setEditBedModal(null)}
@@ -2093,9 +2038,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* 5. ADD LOCATION / SECTOR MODAL */}
       {showAddLocation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl sm:max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold text-sm">
                   📍
@@ -2113,7 +2058,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateLocation} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateLocation} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               {/* Visual Interactive Map Preview */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
@@ -2125,7 +2070,7 @@ export default function Dashboard({ user, onLogout }) {
                   </span>
                 </div>
                 <div
-                  className="relative w-full h-44 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden cursor-crosshair select-none shadow-inner"
+                  className="relative w-full h-64 sm:h-72 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden cursor-crosshair select-none shadow-inner"
                   onMouseDown={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = Math.round(Math.max(50, Math.min(800, ((e.clientX - rect.left) / rect.width) * 860)));
@@ -2161,7 +2106,7 @@ export default function Dashboard({ user, onLogout }) {
                           x2={p2.x}
                           y2={p2.y}
                           stroke="#334155"
-                          strokeWidth="1.5"
+                          strokeWidth="2"
                           opacity={0.35}
                         />
                       );
@@ -2175,8 +2120,8 @@ export default function Dashboard({ user, onLogout }) {
                         x2={(state?.coords?.[newLocation.connectedTo] || { x: 420, y: 140 }).x}
                         y2={(state?.coords?.[newLocation.connectedTo] || { x: 420, y: 140 }).y}
                         stroke="#38bdf8"
-                        strokeWidth="2.5"
-                        strokeDasharray="5 4"
+                        strokeWidth="3"
+                        strokeDasharray="6 4"
                       />
                     )}
 
@@ -2189,18 +2134,18 @@ export default function Dashboard({ user, onLogout }) {
                           <circle
                             cx={c.x}
                             cy={c.y}
-                            r={isConnected ? 9 : 6}
+                            r={isConnected ? 13 : 10}
                             fill={isConnected ? "#0284c7" : "#1e293b"}
                             stroke={isConnected ? "#38bdf8" : "#64748b"}
-                            strokeWidth={isConnected ? 2 : 1.5}
+                            strokeWidth={isConnected ? 2.5 : 1.5}
                           />
                           <text
                             x={c.x}
-                            y={c.y + 15}
+                            y={c.y + 18}
                             fill={isConnected ? "#38bdf8" : "#94a3b8"}
-                            fontSize="10"
+                            fontSize="12"
                             textAnchor="middle"
-                            fontWeight={isConnected ? "bold" : "normal"}
+                            fontWeight={isConnected ? "bold" : "600"}
                           >
                             {z}
                           </text>
@@ -2210,14 +2155,14 @@ export default function Dashboard({ user, onLogout }) {
 
                     {/* New Sector Pin */}
                     <g>
-                      <circle cx={newLocation.x} cy={newLocation.y} r="18" fill="#0284c7" fillOpacity="0.3" className="animate-ping" />
-                      <circle cx={newLocation.x} cy={newLocation.y} r="12" fill="#0284c7" stroke="#ffffff" strokeWidth="2.5" />
-                      <circle cx={newLocation.x} cy={newLocation.y} r="4" fill="#ffffff" />
+                      <circle cx={newLocation.x} cy={newLocation.y} r="24" fill="#0284c7" fillOpacity="0.3" className="animate-ping" />
+                      <circle cx={newLocation.x} cy={newLocation.y} r="15" fill="#0284c7" stroke="#ffffff" strokeWidth="2.5" />
+                      <circle cx={newLocation.x} cy={newLocation.y} r="5" fill="#ffffff" />
                       <text
                         x={newLocation.x}
-                        y={newLocation.y - 16}
+                        y={newLocation.y - 20}
                         fill="#38bdf8"
-                        fontSize="11"
+                        fontSize="13"
                         fontWeight="bold"
                         textAnchor="middle"
                       >
@@ -2316,11 +2261,10 @@ export default function Dashboard({ user, onLogout }) {
                             y: coords.y,
                           });
                         }}
-                        className={`py-1.5 px-2 rounded-lg text-center font-medium transition text-[11px] border ${
-                          newLocation.direction === d.id
-                            ? "bg-sky-50 dark:bg-sky-950/60 border-sky-600 text-sky-700 dark:text-sky-300 font-bold"
-                            : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
-                        }`}
+                        className={`py-1.5 px-2 rounded-lg text-center font-medium transition text-[11px] border ${newLocation.direction === d.id
+                          ? "bg-sky-50 dark:bg-sky-950/60 border-sky-600 text-sky-700 dark:text-sky-300 font-bold"
+                          : "bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                          }`}
                       >
                         {d.label}
                       </button>
@@ -2367,17 +2311,17 @@ export default function Dashboard({ user, onLogout }) {
                     {newLocation.direction === "above"
                       ? `Directly above ${newLocation.connectedTo}`
                       : newLocation.direction === "right"
-                      ? `To the right of ${newLocation.connectedTo}`
-                      : newLocation.direction === "below"
-                      ? `Below ${newLocation.connectedTo}`
-                      : newLocation.direction === "left"
-                      ? `To the left of ${newLocation.connectedTo}`
-                      : "Custom placement"}
+                        ? `To the right of ${newLocation.connectedTo}`
+                        : newLocation.direction === "below"
+                          ? `Below ${newLocation.connectedTo}`
+                          : newLocation.direction === "left"
+                            ? `To the left of ${newLocation.connectedTo}`
+                            : "Custom placement"}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <button
                   type="button"
                   onClick={() => setShowAddLocation(false)}
@@ -2399,9 +2343,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* 6. ADD / CONNECT ROAD MODAL */}
       {showAddRoad && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl sm:max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-sm">
                   🛣️
@@ -2419,7 +2363,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleCreateRoad} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleCreateRoad} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               {/* Visual Road Connection Preview */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
@@ -2430,7 +2374,7 @@ export default function Dashboard({ user, onLogout }) {
                     Click any node to select endpoint
                   </span>
                 </div>
-                <div className="relative w-full h-44 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden select-none shadow-inner">
+                <div className="relative w-full h-64 sm:h-72 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden select-none shadow-inner">
                   <svg viewBox="0 0 860 460" className="w-full h-full">
                     <defs>
                       <pattern id="grid-road" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -2451,7 +2395,7 @@ export default function Dashboard({ user, onLogout }) {
                           x2={p2.x}
                           y2={p2.y}
                           stroke="#334155"
-                          strokeWidth="1.5"
+                          strokeWidth="2"
                           opacity={0.35}
                         />
                       );
@@ -2471,7 +2415,7 @@ export default function Dashboard({ user, onLogout }) {
                             x2={p2.x}
                             y2={p2.y}
                             stroke="#10b981"
-                            strokeWidth="3.5"
+                            strokeWidth="4"
                             strokeDasharray="6 4"
                           />
                           <rect
@@ -2488,7 +2432,7 @@ export default function Dashboard({ user, onLogout }) {
                             x={midX}
                             y={midY + 2}
                             fill="#a7f3d0"
-                            fontSize="10"
+                            fontSize="11"
                             fontWeight="bold"
                             textAnchor="middle"
                           >
@@ -2515,23 +2459,23 @@ export default function Dashboard({ user, onLogout }) {
                           }}
                         >
                           {isSelected && (
-                            <circle cx={c.x} cy={c.y} r="16" fill="#10b981" fillOpacity="0.3" className="animate-ping" />
+                            <circle cx={c.x} cy={c.y} r="22" fill="#10b981" fillOpacity="0.3" className="animate-ping" />
                           )}
                           <circle
                             cx={c.x}
                             cy={c.y}
-                            r={isSelected ? 10 : 6}
+                            r={isSelected ? 14 : 10}
                             fill={isSelected ? "#10b981" : "#1e293b"}
                             stroke={isSelected ? "#ffffff" : "#64748b"}
                             strokeWidth={isSelected ? 2.5 : 1.5}
                           />
                           <text
                             x={c.x}
-                            y={c.y + 16}
+                            y={c.y + 18}
                             fill={isSelected ? "#6ee7b7" : "#94a3b8"}
-                            fontSize="10"
+                            fontSize="12"
                             textAnchor="middle"
-                            fontWeight={isSelected ? "bold" : "normal"}
+                            fontWeight={isSelected ? "bold" : "600"}
                           >
                             {z}
                           </text>
@@ -2583,16 +2527,18 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                {state?.roads?.some((r) => (r.u === newRoad.u && r.v === newRoad.v) || (r.u === newRoad.v && r.v === newRoad.u)) ? (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteRoad(newRoad.u, newRoad.v)}
-                    className="px-3 py-2 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-200 dark:border-red-900/60 rounded-lg transition flex items-center gap-1.5"
-                  >
-                    <span>🗑️</span> Disconnect Road
-                  </button>
-                ) : <div />}
+              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
+                <div>
+                  {newRoad.u && newRoad.v && newRoad.u !== newRoad.v && state?.roads?.some((r) => (r.u === newRoad.u && r.v === newRoad.v) || (r.u === newRoad.v && r.v === newRoad.u)) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRoad(newRoad.u, newRoad.v)}
+                      className="px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition"
+                    >
+                      🗑️ Disconnect Road
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
@@ -2616,9 +2562,9 @@ export default function Dashboard({ user, onLogout }) {
 
       {/* 7. EDIT SECTOR / LOCATION MODAL */}
       {showEditLocation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-sm animate-fade-in text-left">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl sm:max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm">
                   ✏️
@@ -2636,7 +2582,7 @@ export default function Dashboard({ user, onLogout }) {
               </button>
             </div>
 
-            <form onSubmit={handleUpdateLocation} className="p-6 space-y-4 text-xs">
+            <form onSubmit={handleUpdateLocation} className="p-6 space-y-4 text-xs flex-1 overflow-y-auto">
               {/* Visual Interactive Map Preview with Drag and Click to Adjust */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px]">
@@ -2648,7 +2594,7 @@ export default function Dashboard({ user, onLogout }) {
                   </span>
                 </div>
                 <div
-                  className="relative w-full h-48 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden cursor-crosshair select-none shadow-inner"
+                  className="relative w-full h-64 sm:h-72 bg-slate-950 border border-slate-800 rounded-xl overflow-hidden cursor-crosshair select-none shadow-inner"
                   onMouseDown={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const x = Math.round(Math.max(50, Math.min(800, ((e.clientX - rect.left) / rect.width) * 860)));
@@ -2685,8 +2631,8 @@ export default function Dashboard({ user, onLogout }) {
                           x2={vCoord.x}
                           y2={vCoord.y}
                           stroke={isConnected ? "#818cf8" : "#334155"}
-                          strokeWidth={isConnected ? 2.5 : 1.5}
-                          strokeDasharray={isConnected ? "5 4" : "none"}
+                          strokeWidth={isConnected ? 3 : 2}
+                          strokeDasharray={isConnected ? "6 4" : "none"}
                           opacity={isConnected ? 0.95 : 0.35}
                         />
                       );
@@ -2699,8 +2645,8 @@ export default function Dashboard({ user, onLogout }) {
                         const c = state?.coords?.[z] || { x: 420, y: 140 };
                         return (
                           <g key={z}>
-                            <circle cx={c.x} cy={c.y} r="7" fill="#1e293b" stroke="#64748b" strokeWidth="1.5" />
-                            <text x={c.x} y={c.y + 15} fill="#94a3b8" fontSize="10" textAnchor="middle">
+                            <circle cx={c.x} cy={c.y} r="10" fill="#1e293b" stroke="#64748b" strokeWidth="2" />
+                            <text x={c.x} y={c.y + 18} fill="#94a3b8" fontSize="12" fontWeight="600" textAnchor="middle">
                               {z}
                             </text>
                           </g>
@@ -2709,24 +2655,24 @@ export default function Dashboard({ user, onLogout }) {
 
                     {/* Target Sector Pin Being Edited (Glowing & Interactive) */}
                     <g>
-                      <circle cx={editLocation.x} cy={editLocation.y} r="20" fill="#6366f1" fillOpacity="0.25" className="animate-ping" />
-                      <circle cx={editLocation.x} cy={editLocation.y} r="13" fill="#4f46e5" stroke="#ffffff" strokeWidth="2.5" />
-                      <circle cx={editLocation.x} cy={editLocation.y} r="4" fill="#ffffff" />
+                      <circle cx={editLocation.x} cy={editLocation.y} r="28" fill="#6366f1" fillOpacity="0.25" className="animate-ping" />
+                      <circle cx={editLocation.x} cy={editLocation.y} r="16" fill="#4f46e5" stroke="#ffffff" strokeWidth="2.5" />
+                      <circle cx={editLocation.x} cy={editLocation.y} r="5" fill="#ffffff" />
                       <rect
-                        x={editLocation.x - 55}
-                        y={editLocation.y - 30}
-                        width="110"
-                        height="18"
-                        rx="9"
+                        x={editLocation.x - 60}
+                        y={editLocation.y - 34}
+                        width="120"
+                        height="22"
+                        rx="11"
                         fill="#312e81"
                         stroke="#818cf8"
-                        strokeWidth="1"
+                        strokeWidth="1.5"
                       />
                       <text
                         x={editLocation.x}
-                        y={editLocation.y - 18}
+                        y={editLocation.y - 19}
                         fill="#ffffff"
-                        fontSize="10"
+                        fontSize="12"
                         fontWeight="bold"
                         textAnchor="middle"
                       >
@@ -2861,13 +2807,13 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800 shrink-0 sticky bottom-0 bg-white dark:bg-slate-900 z-10">
                 <button
                   type="button"
                   onClick={() => handleDeleteLocation(editLocation.selected)}
-                  className="px-3.5 py-2 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-200 dark:border-red-900/60 rounded-lg transition flex items-center gap-1.5"
+                  className="px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition"
                 >
-                  <span>🗑️</span> Remove Sector
+                  🗑️ Remove Sector
                 </button>
                 <div className="flex items-center gap-2">
                   <button

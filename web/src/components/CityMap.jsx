@@ -148,12 +148,29 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
         }
         ctx.stroke();
 
-        // Distance Tag
+        // Distance Tag with subtle readable badge
         const midX = (p1.x + p2.x) / 2;
         const midY = (p1.y + p2.y) / 2;
-        ctx.fillStyle = r.isClosed ? "#dc2626" : (isDark ? "#94a3b8" : "#64748b");
-        ctx.font = "11px Roboto, sans-serif";
-        ctx.fillText(`${r.weight} km`, midX + 4, midY - 4);
+        const distText = `${r.weight} km`;
+        ctx.font = "bold 11px Roboto, sans-serif";
+        const textMetrics = ctx.measureText(distText);
+        const padX = 5;
+        const badgeW = textMetrics.width + padX * 2;
+        const badgeH = 16;
+
+        ctx.fillStyle = isDark ? "#0f172a" : "#ffffff";
+        ctx.fillRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
+
+        ctx.strokeStyle = r.isClosed ? "#ef4444" : (isDark ? "#334155" : "#cbd5e1");
+        ctx.lineWidth = 1;
+        ctx.strokeRect(midX - badgeW / 2, midY - badgeH / 2, badgeW, badgeH);
+
+        ctx.fillStyle = r.isClosed ? "#ef4444" : (isDark ? "#94a3b8" : "#475569");
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(distText, midX, midY);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
       });
       ctx.setLineDash([]);
 
@@ -229,10 +246,10 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
 
         // Node Circle
         ctx.beginPath();
-        ctx.arc(x, y, 14, 0, 2 * Math.PI);
+        ctx.arc(x, y, 16, 0, 2 * Math.PI);
         ctx.fillStyle = isDark ? "#0f172a" : "#ffffff";
         ctx.fill();
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.strokeStyle = hasAmbulance
           ? "#16a34a"
           : hasHospital
@@ -242,7 +259,7 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
 
         // Center Indicator Dot
         ctx.beginPath();
-        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.arc(x, y, 5, 0, 2 * Math.PI);
         ctx.fillStyle = hasAmbulance
           ? "#16a34a"
           : hasHospital
@@ -251,22 +268,22 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
         ctx.fill();
 
         // Node Label
-        ctx.fillStyle = isDark ? "#f1f5f9" : "#0f172a";
-        ctx.font = "bold 12px Roboto, sans-serif";
-        ctx.fillText(zone, x + 20, y + 4);
+        ctx.fillStyle = isDark ? "#f8fafc" : "#0f172a";
+        ctx.font = "bold 13px Roboto, sans-serif";
+        ctx.fillText(zone, x + 22, y + 4);
 
         // Subtext tags
-        let subY = y + 18;
+        let subY = y + 19;
         if (hasAmbulance) {
           ctx.fillStyle = "#16a34a";
-          ctx.font = "10px Roboto, sans-serif";
-          ctx.fillText("🚑 Unit Stationed", x + 20, subY);
-          subY += 12;
+          ctx.font = "600 11px Roboto, sans-serif";
+          ctx.fillText("🚑 Unit Stationed", x + 22, subY);
+          subY += 13;
         }
         if (hasHospital) {
           ctx.fillStyle = "#2563eb";
-          ctx.font = "10px Roboto, sans-serif";
-          ctx.fillText("🏥 Hospital", x + 20, subY);
+          ctx.font = "600 11px Roboto, sans-serif";
+          ctx.fillText("🏥 Hospital", x + 22, subY);
         }
       });
 
@@ -564,13 +581,13 @@ export default function CityMap({ state, activeRoute, activeDispatch, onClearRou
       {/* CANVAS CONTAINER */}
       <div
         ref={containerRef}
-        className="relative overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 min-h-[460px]"
+        className="relative overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-3 sm:p-5 min-h-[500px] w-full shadow-inner"
       >
         <canvas
           ref={canvasRef}
           width={860}
           height={460}
-          className="max-w-full h-auto"
+          className="w-full max-w-[960px] h-auto object-contain drop-shadow-sm"
         />
       </div>
     </div>
