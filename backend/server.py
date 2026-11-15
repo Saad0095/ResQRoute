@@ -120,6 +120,18 @@ def edit_location(location_name: str, req: EditLocationRequest):
     }
 
 
+@app.delete("/api/locations/{location_name}")
+def delete_location(location_name: str):
+    """Remove a sector node and all its connected roads from the network."""
+    res = state.remove_location_record(location_name)
+    return {
+        **res,
+        "locations": state.graph.get_nodes(),
+        "roads": state.graph.get_roads(),
+        "coords": state.custom_node_coords
+    }
+
+
 @app.get("/api/roads")
 def get_roads():
     return {"roads": state.graph.get_roads()}
@@ -144,6 +156,18 @@ def add_road(req: AddRoadRequest):
         "u": u,
         "v": v,
         "weight": weight,
+        "roads": state.graph.get_roads()
+    }
+
+
+@app.delete("/api/roads/{u}/{v}")
+def delete_road(u: str, v: str):
+    """Remove an arterial road connection between two sectors."""
+    removed = state.graph.remove_road(u.strip(), v.strip())
+    return {
+        "success": removed,
+        "u": u,
+        "v": v,
         "roads": state.graph.get_roads()
     }
 
@@ -452,3 +476,38 @@ def get_incidents():
         return {"incidents": result, "total": len(result)}
     except Exception as e:
         return {"incidents": [], "total": 0, "error": str(e)}
+
+
+@app.delete("/api/incidents/{incident_id}")
+def delete_incident(incident_id: int):
+    """Delete a single persisted emergency call from database and in-memory history."""
+    try:
+        db = SessionLocal()
+        inc = db.query(IncidentDB).filter(IncidentDB.id == incident_id).first()
+        if not inc:
+            db.close()
+            raise HTTPException(404, "Incident not found.")
+        emg_id = inc.emergency_id
+        db.delete(inc)
+        db.commit()
+        db.close()
+        state.dispatch_history = [d for d in state.dispatch_history if d.get("emergencyId") != emg_id]
+        return {"success": True, "message": f"Incident #{incident_id} deleted."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"Error deleting incident: {e}")
+
+
+@app.delete("/api/incidents")
+def clear_all_incidents():
+    """Clear all historical emergency call records from database and memory."""
+    try:
+        db = SessionLocal()
+        db.query(IncidentDB).delete()
+        db.commit()
+        db.close()
+        state.dispatch_history = []
+        return {"success": True, "message": "Call history cleared."}
+    except Exception as e:
+        raise HTTPException(500, f"Error clearing call history: {e}")

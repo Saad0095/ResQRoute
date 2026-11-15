@@ -51,6 +51,33 @@ class CityGraph:
         self.adj_list[u].append((v, weight))
         self.adj_list[v].append((u, weight))
 
+    def remove_road(self, u: str, v: str) -> bool:
+        """Removes a bidirectional road artery between zones u and v."""
+        removed = False
+        if u in self.adj_list:
+            prev_len = len(self.adj_list[u])
+            self.adj_list[u] = [(neighbor, w) for neighbor, w in self.adj_list[u] if neighbor != v]
+            if len(self.adj_list[u]) < prev_len:
+                removed = True
+        if v in self.adj_list:
+            self.adj_list[v] = [(neighbor, w) for neighbor, w in self.adj_list[v] if neighbor != u]
+        key = self._edge_key(u, v)
+        if key in self.closed_roads:
+            self.closed_roads.remove(key)
+        return removed
+
+    def remove_node(self, node: str) -> bool:
+        """Removes a sector node and all incident road edges connected to it."""
+        if node not in self.adj_list:
+            return False
+        # Remove incoming edges from all neighbors
+        for neighbor, _ in list(self.adj_list[node]):
+            if neighbor in self.adj_list:
+                self.adj_list[neighbor] = [(n, w) for n, w in self.adj_list[neighbor] if n != node]
+        del self.adj_list[node]
+        self.closed_roads = {edge for edge in self.closed_roads if node not in edge}
+        return True
+
     def _edge_key(self, u: str, v: str) -> Tuple[str, str]:
         return (min(u, v), max(u, v))
 

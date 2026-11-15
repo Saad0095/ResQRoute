@@ -295,3 +295,51 @@ export async function fetchIncidents() {
   });
   return await res.json();
 }
+
+export async function deleteLocation(locationName) {
+  const res = await fetch(`${API_BASE_URL}/api/locations/${encodeURIComponent(locationName)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to remove location");
+  }
+  return await res.json();
+}
+
+export async function deleteRoad(u, v) {
+  const res = await fetch(`${API_BASE_URL}/api/roads/${encodeURIComponent(u)}/${encodeURIComponent(v)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to disconnect road");
+  }
+  return await res.json();
+}
+
+export async function deleteIncident(incidentId) {
+  const res = await fetch(`${API_BASE_URL}/api/incidents/${incidentId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to delete incident");
+  }
+  return await res.json();
+}
+
+export async function clearIncidents() {
+  const res = await fetch(`${API_BASE_URL}/api/incidents`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to clear call history");
+  }
+  return await res.json();
+}

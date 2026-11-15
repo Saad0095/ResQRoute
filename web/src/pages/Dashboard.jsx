@@ -16,9 +16,13 @@ import {
   fetchAdminAmbulances,
   createAmbulance,
   fetchIncidents,
+  deleteIncident,
+  clearIncidents,
   addLocation,
   updateLocation,
+  deleteLocation,
   addRoad,
+  deleteRoad,
   planRoute,
 } from "../services/api";
 import { useTheme } from "../context/ThemeContext";
@@ -118,23 +122,23 @@ export default function Dashboard({ user, onLogout }) {
 
   const loadData = async () => {
     try {
-      const [statusData, roadsData] = await Promise.all([
+      const [statusData, roadsData, incData] = await Promise.all([
         fetchSystemStatus(),
         fetchRoads(),
+        fetchIncidents().catch(() => ({ incidents: [] })),
       ]);
       setState({ ...statusData, roads: roadsData.roads });
+      setIncidents(incData.incidents || []);
 
       if (user.role === "ADMIN" || user.role === "DISPATCHER") {
-        const [u, h, a, inc] = await Promise.all([
+        const [u, h, a] = await Promise.all([
           fetchUsers().catch(() => []),
           fetchAdminHospitals().catch(() => []),
           fetchAdminAmbulances().catch(() => []),
-          fetchIncidents().catch(() => ({ incidents: [] })),
         ]);
         setUsersList(u);
         setHospitalsList(h);
         setAmbulancesList(a);
-        setIncidents(inc.incidents || []);
       }
     } catch (err) {
       console.error(err);
@@ -435,6 +439,59 @@ export default function Dashboard({ user, onLogout }) {
       });
       showMsg(`Location "${editLocation.newName.trim() || editLocation.selected}" updated successfully!`);
       setShowEditLocation(false);
+      await loadData();
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
+  const handleDeleteLocation = async (locName) => {
+    const target = locName || editLocation.selected;
+    if (!target) return;
+    if (!window.confirm(`Are you sure you want to remove sector "${target}" from the city network? All connecting roads will be removed.`)) {
+      return;
+    }
+    try {
+      await deleteLocation(target);
+      showMsg(`Sector "${target}" removed successfully!`);
+      setShowEditLocation(false);
+      await loadData();
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
+  const handleDeleteRoad = async (u, v) => {
+    if (!u || !v) return;
+    if (!window.confirm(`Are you sure you want to disconnect the road between ${u} ⇄ ${v}?`)) {
+      return;
+    }
+    try {
+      await deleteRoad(u, v);
+      showMsg(`Road between ${u} ⇄ ${v} disconnected!`);
+      setShowAddRoad(false);
+      await loadData();
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
+  const handleDeleteIncident = async (id, emergencyId) => {
+    if (!window.confirm(`Delete record for call ${emergencyId}?`)) return;
+    try {
+      await deleteIncident(id);
+      showMsg(`Emergency call record ${emergencyId} deleted!`);
+      await loadData();
+    } catch (err) {
+      showMsg(err.message, true);
+    }
+  };
+
+  const handleClearAllIncidents = async () => {
+    if (!window.confirm("Are you sure you want to clear all call history records? This cannot be undone.")) return;
+    try {
+      await clearIncidents();
+      showMsg("All call history records cleared!");
       await loadData();
     } catch (err) {
       showMsg(err.message, true);
@@ -1111,6 +1168,7 @@ export default function Dashboard({ user, onLogout }) {
               <RoadControls
                 roads={state?.roads}
                 onToggleRoad={handleToggleRoad}
+                onDeleteRoad={handleDeleteRoad}
               />
             </div>
           )}
@@ -1274,9 +1332,19 @@ export default function Dashboard({ user, onLogout }) {
           {/* 6. CALL HISTORY PAGE */}
           {activeTab === "history" && (
             <div className="w-full space-y-6">
-              <div>
-                <h1 className="text-xl font-bold text-slate-900 dark:text-white">Call History</h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Chronological record of emergency dispatches and live field status</p>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-xl font-bold text-slate-900 dark:text-white">Call History</h1>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Chronological record of emergency dispatches and live field status (Persisted in Database)</p>
+                </div>
+                {incidents.length > 0 && (
+                  <button
+                    onClick={handleClearAllIncidents}
+                    className="px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-900/60 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 text-xs font-medium transition flex items-center gap-1.5"
+                  >
+                    <span>🗑️</span> Clear Call History
+                  </button>
+                )}
               </div>
 
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
@@ -1291,6 +1359,7 @@ export default function Dashboard({ user, onLogout }) {
                       <th className="px-4 py-3">Distance</th>
                       <th className="px-4 py-3">ETA</th>
                       <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1336,11 +1405,20 @@ export default function Dashboard({ user, onLogout }) {
                             {inc.status}
                           </span>
                         </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => handleDeleteIncident(inc.id, inc.emergencyId)}
+                            title="Delete Call Record"
+                            className="p-1 text-slate-400 hover:text-red-600 transition"
+                          >
+                            🗑️
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {incidents.length === 0 && (
                       <tr>
-                        <td colSpan={8} className="text-center py-8 text-slate-400">
+                        <td colSpan={9} className="text-center py-8 text-slate-400">
                           No emergency calls recorded yet.
                         </td>
                       </tr>
@@ -2505,20 +2583,31 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setShowAddRoad(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"
-                >
-                  Save Road
-                </button>
+              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                {state?.roads?.some((r) => (r.u === newRoad.u && r.v === newRoad.v) || (r.u === newRoad.v && r.v === newRoad.u)) ? (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteRoad(newRoad.u, newRoad.v)}
+                    className="px-3 py-2 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-200 dark:border-red-900/60 rounded-lg transition flex items-center gap-1.5"
+                  >
+                    <span>🗑️</span> Disconnect Road
+                  </button>
+                ) : <div />}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddRoad(false)}
+                    className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition"
+                  >
+                    Save Road
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2772,20 +2861,29 @@ export default function Dashboard({ user, onLogout }) {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center justify-between gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setShowEditLocation(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  onClick={() => handleDeleteLocation(editLocation.selected)}
+                  className="px-3.5 py-2 text-xs font-medium text-red-600 hover:text-white hover:bg-red-600 border border-red-200 dark:border-red-900/60 rounded-lg transition flex items-center gap-1.5"
                 >
-                  Cancel
+                  <span>🗑️</span> Remove Sector
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition"
-                >
-                  Save Changes
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditLocation(false)}
+                    className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm transition"
+                  >
+                    Save Changes
+                  </button>
+                </div>
               </div>
             </form>
           </div>

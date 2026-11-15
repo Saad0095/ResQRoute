@@ -95,6 +95,7 @@ def sync_from_db():
                     hosp_id=h.id
                 )
         db.close()
+        load_dispatch_history_from_db()
     except Exception as e:
         print(f"[WARN] sync_from_db skipped or failed: {e}")
 
@@ -204,6 +205,77 @@ def update_location_record(
         "name": clean_new,
         "coords": custom_node_coords.get(clean_new)
     }
+
+
+def remove_location_record(name: str) -> Dict[str, Any]:
+    """Removes a sector from graph and coordinates registry, safely relocating stationed units."""
+    global custom_node_coords, ambulances, hospitals, graph
+    clean_name = canonicalize_node_name(name)
+
+    graph.remove_node(clean_name)
+    if clean_name in custom_node_coords:
+        del custom_node_coords[clean_name]
+
+    # Clean any legacy alias variations
+    for alias in ["Gulistan-e-Johar", "Gulistan e Jauhar", "Gulistan e Johar", "Gulistane Jauhar"]:
+        if alias == clean_name or alias in custom_node_coords:
+            if alias in custom_node_coords:
+                del custom_node_coords[alias]
+            graph.remove_node(alias)
+
+    # Safe fallback sector for any units stationed at the deleted sector
+    fallback = "Gulshan" if "Gulshan" in graph.get_nodes() else (graph.get_nodes()[0] if graph.get_nodes() else "Center")
+    for amb in ambulances:
+        if amb.location == clean_name:
+            amb.location = fallback
+    for hosp in hospitals:
+        if hosp.location == clean_name:
+            hosp.location = fallback
+
+    return {
+        "success": True,
+        "removed": clean_name,
+        "fallback": fallback
+    }
+
+
+def load_dispatch_history_from_db():
+    """Restores dispatch call history from SQLite on backend startup."""
+    global dispatch_history
+    try:
+        from datetime import datetime
+        try:
+            from database.connection import SessionLocal
+            from database.models_db import IncidentDB
+        except ImportError:
+            from backend.database.connection import SessionLocal
+            from backend.database.models_db import IncidentDB
+        db = SessionLocal()
+        incidents = db.query(IncidentDB).order_by(IncidentDB.created_at.asc()).all()
+        history = []
+        for i in incidents:
+            ts_str = None
+            if i.created_at:
+                if isinstance(i.created_at, (int, float)):
+                    ts_str = datetime.fromtimestamp(i.created_at).isoformat()
+                else:
+                    ts_str = str(i.created_at)
+            history.append({
+                "emergencyId": i.emergency_id,
+                "patientName": i.patient_name,
+                "patientLocation": i.location,
+                "severityLabel": i.severity_label,
+                "ambulanceId": i.ambulance_id,
+                "hospitalId": i.hospital_id,
+                "totalTripDistanceKm": i.distance_km,
+                "totalEtaMinutes": i.eta_minutes,
+                "status": i.status,
+                "createdAt": ts_str,
+            })
+        db.close()
+        dispatch_history = history
+    except Exception as e:
+        print(f"[WARN] Could not restore dispatch history from DB: {e}")
 
 
 def add_ambulance_record(
