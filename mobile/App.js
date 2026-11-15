@@ -58,6 +58,7 @@ export default function App() {
   const [callerPhone, setCallerPhone] = useState("");
   const [emergencyType, setEmergencyType] = useState("Cardiac / Severe Injury");
   const [remainingEta, setRemainingEta] = useState(0);
+  const [liveEmergencyStatus, setLiveEmergencyStatus] = useState("Idle");
 
   // Driver Auth State
   const [driverUser, setDriverUser] = useState(null);
@@ -197,10 +198,10 @@ export default function App() {
     }
   };
 
-  // Live Vehicle Progress Tracker: Advances ambulance along full 2-stage route in real time
+  // Live Vehicle Progress Tracker: Advances ambulance along route respecting live dispatch status
   useEffect(() => {
     let progressTimer;
-    if (dispatchResult) {
+    if (dispatchResult && liveEmergencyStatus !== "Completed") {
       const pickup = dispatchResult.ambulanceRoute || [];
       const hosp = dispatchResult.hospitalRoute || [];
       const fullRoute = [
@@ -209,19 +210,76 @@ export default function App() {
       ];
 
       if (fullRoute.length > 1) {
-        setTrackingStepIndex(0);
         progressTimer = setInterval(() => {
           setTrackingStepIndex((prev) => {
-            if (prev < fullRoute.length - 1) {
-              return prev + 1;
+            // While en route to patient, advance up to patient node
+            if (liveEmergencyStatus === "Dispatched" || liveEmergencyStatus === "Idle") {
+              const patientIdx = Math.max(0, pickup.length - 1);
+              if (prev < patientIdx) {
+                return prev + 1;
+              }
+              return prev;
+            }
+            // If already at scene, hold at patient node
+            if (liveEmergencyStatus === "At Scene" || liveEmergencyStatus === "At Patient") {
+              return Math.max(0, pickup.length - 1);
+            }
+            // If transporting to hospital, advance along hospital route
+            if (liveEmergencyStatus === "Transporting") {
+              if (prev < fullRoute.length - 1) {
+                return Math.max(pickup.length, prev + 1);
+              }
+              return prev;
             }
             return prev;
           });
-        }, 4000); // Advances one road node every 4 seconds for live demonstration
+        }, 3500);
       }
     }
     return () => clearInterval(progressTimer);
-  }, [dispatchResult]);
+  }, [dispatchResult, liveEmergencyStatus]);
+
+  // Real-time synchronization: Poll assigned ambulance mission for Citizen view
+  useEffect(() => {
+    let pollInterval;
+    if (dispatchResult?.assignedAmbulance?.id && liveEmergencyStatus !== "Completed") {
+      const ambId = dispatchResult.assignedAmbulance.id;
+      const emergencyId = dispatchResult.emergencyId;
+      const pickupLen = (dispatchResult.ambulanceRoute || []).length;
+      const hospLen = (dispatchResult.hospitalRoute || []).length;
+      const fullLen = pickupLen + (hospLen > 1 ? hospLen - 1 : 0);
+
+      const checkLiveStatus = async () => {
+        try {
+          const ambData = await fetchAmbulanceMission(ambId);
+          if (!ambData) return;
+
+          // If ambulance is still assigned to this active mission
+          if (ambData.currentMission && ambData.currentMission.emergencyId === emergencyId) {
+            const serverStatus = ambData.status;
+            if (serverStatus && serverStatus !== liveEmergencyStatus) {
+              setLiveEmergencyStatus(serverStatus);
+              if (serverStatus === "At Scene" || serverStatus === "At Patient") {
+                setTrackingStepIndex((prev) => Math.max(prev, Math.max(0, pickupLen - 1)));
+              } else if (serverStatus === "Transporting") {
+                setTrackingStepIndex((prev) => Math.max(prev, Math.max(0, pickupLen)));
+              }
+            }
+          } else if (!ambData.currentMission || ambData.status === "Available" || ambData.status === "Completed") {
+            // Driver marked mission completed and ambulance returned to available pool
+            setLiveEmergencyStatus("Completed");
+            setTrackingStepIndex(Math.max(0, fullLen - 1));
+          }
+        } catch (e) {
+          // Ignore transient network errors during background polling
+        }
+      };
+
+      checkLiveStatus();
+      pollInterval = setInterval(checkLiveStatus, 2500);
+    }
+    return () => clearInterval(pollInterval);
+  }, [dispatchResult, liveEmergencyStatus]);
 
   // Poll driver mission when authenticated
   useEffect(() => {
@@ -279,6 +337,8 @@ export default function App() {
 
       if (response && response.success) {
         setDispatchResult(response);
+        setLiveEmergencyStatus("Dispatched");
+        setTrackingStepIndex(0);
         setRemainingEta(response.ambulanceEtaMinutes || 4);
       } else {
         showAlert(
@@ -293,10 +353,20 @@ export default function App() {
     }
   };
 
+  const handleDismissCompleted = () => {
+    setDispatchResult(null);
+    setLiveEmergencyStatus("Idle");
+  };
+
   const handleCancel = () => {
+    if (liveEmergencyStatus === "Completed") {
+      handleDismissCompleted();
+      return;
+    }
     if (typeof window !== "undefined" && window.confirm) {
       if (window.confirm("Are you sure you want to cancel the emergency dispatch?")) {
         setDispatchResult(null);
+        setLiveEmergencyStatus("Idle");
         resetSimulation();
       }
       return;
@@ -312,6 +382,7 @@ export default function App() {
           style: "destructive",
           onPress: () => {
             setDispatchResult(null);
+            setLiveEmergencyStatus("Idle");
             resetSimulation();
           },
         },
@@ -350,12 +421,31 @@ export default function App() {
     try {
       await updateAmbulanceStatus(ambId, newStatus);
       setDriverStatus(newStatus);
+
+      // Keep Citizen view synchronized immediately on same device
       if (newStatus === "Completed") {
+        setLiveEmergencyStatus("Completed");
         setDriverMission(null);
+        if (dispatchResult) {
+          const pLen = (dispatchResult.ambulanceRoute || []).length;
+          const hLen = (dispatchResult.hospitalRoute || []).length;
+          const fLen = pLen + (hLen > 1 ? hLen - 1 : 0);
+          setTrackingStepIndex(Math.max(0, fLen - 1));
+        }
         showAlert("Mission Complete", `Ambulance #${ambId} has completed handover and is now Available.`);
       } else {
+        setLiveEmergencyStatus(newStatus);
+        if (dispatchResult) {
+          const pLen = (dispatchResult.ambulanceRoute || []).length;
+          if (newStatus === "At Scene") {
+            setTrackingStepIndex(Math.max(0, pLen - 1));
+          } else if (newStatus === "Transporting") {
+            setTrackingStepIndex(Math.max(0, pLen));
+          }
+        }
         showAlert("Status Updated", `Ambulance #${ambId} mission status set to: "${newStatus}"`);
       }
+
       const data = await fetchAmbulanceMission(ambId);
       if (data) {
         setDriverStatus(data.status);
@@ -555,21 +645,86 @@ export default function App() {
             contentContainerStyle={styles.hudContainer}
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.dispatchedBanner}>
+            {/* DYNAMIC TOP EMERGENCY STATUS BANNER */}
+            <View style={[
+              styles.dispatchedBanner,
+              liveEmergencyStatus === "Completed"
+                ? { backgroundColor: "#059669" }
+                : liveEmergencyStatus === "Transporting"
+                ? { backgroundColor: "#2563EB" }
+                : liveEmergencyStatus === "At Scene"
+                ? { backgroundColor: "#D97706" }
+                : {}
+            ]}>
               <View style={styles.pulseDot} />
-              <Text style={styles.dispatchedBannerText}>AMBULANCE EN ROUTE</Text>
-            </View>
-
-            <View style={styles.etaCard}>
-              <Text style={styles.etaLabel}>ESTIMATED VEHICLE ARRIVAL AT SCENE</Text>
-              <View style={styles.etaRow}>
-                <Text style={styles.etaValue}>{remainingEta}</Text>
-                <Text style={styles.etaUnit}>MINS</Text>
-              </View>
-              <Text style={styles.etaDistance}>
-                Pickup: {dispatchResult.ambulanceDistanceKm} km • Total Trip to Hospital: {dispatchResult.totalTripDistanceKm} km (~{dispatchResult.totalEtaMinutes} mins)
+              <Text style={styles.dispatchedBannerText}>
+                {liveEmergencyStatus === "Completed"
+                  ? "✓ PATIENT HANDOVER COMPLETED"
+                  : liveEmergencyStatus === "Transporting"
+                  ? "🏥 TRANSPORTING TO HOSPITAL"
+                  : liveEmergencyStatus === "At Scene"
+                  ? "📍 AMBULANCE AT SCENE"
+                  : "AMBULANCE EN ROUTE"}
               </Text>
             </View>
+
+            {/* DYNAMIC ETA CARD OR COMPLETED CARD */}
+            {liveEmergencyStatus === "Completed" ? (
+              <View style={[styles.card, { backgroundColor: "#ECFDF5", borderColor: "#10B981", borderWidth: 1.5, alignItems: "center", paddingVertical: 20, marginBottom: 14 }]}>
+                <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: "#10B981", alignItems: "center", justifyContent: "center", marginBottom: 10 }}>
+                  <Text style={{ fontSize: 24, color: "#FFFFFF", fontWeight: "bold" }}>✓</Text>
+                </View>
+                <Text style={{ fontSize: 17, fontWeight: "900", color: "#065F46", marginBottom: 4 }}>
+                  PATIENT SAFELY AT HOSPITAL
+                </Text>
+                <Text style={{ fontSize: 12.5, color: "#047857", fontWeight: "600", textAlign: "center", paddingHorizontal: 12, marginBottom: 14, lineHeight: 18 }}>
+                  Ambulance #{dispatchResult.assignedAmbulance?.id} has arrived at {dispatchResult.assignedHospital?.name || "Hospital"} and emergency admission is complete.
+                </Text>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: "#10B981",
+                    paddingVertical: 10,
+                    paddingHorizontal: 22,
+                    borderRadius: 8,
+                    ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {})
+                  }}
+                  onPress={handleDismissCompleted}
+                >
+                  <Text style={{ color: "#FFFFFF", fontWeight: "bold", fontSize: 12.5 }}>
+                    ✓ Finish & Return to Home
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.etaCard}>
+                <Text style={styles.etaLabel}>
+                  {liveEmergencyStatus === "Transporting"
+                    ? "ESTIMATED ARRIVAL AT HOSPITAL"
+                    : liveEmergencyStatus === "At Scene"
+                    ? "VEHICLE STATUS ON SCENE"
+                    : "ESTIMATED VEHICLE ARRIVAL AT SCENE"}
+                </Text>
+                <View style={styles.etaRow}>
+                  <Text style={styles.etaValue}>
+                    {liveEmergencyStatus === "At Scene"
+                      ? "0"
+                      : liveEmergencyStatus === "Transporting"
+                      ? (dispatchResult.hospitalEtaMinutes || 3)
+                      : remainingEta}
+                  </Text>
+                  <Text style={styles.etaUnit}>
+                    {liveEmergencyStatus === "At Scene" ? "MINS (ARRIVED)" : "MINS"}
+                  </Text>
+                </View>
+                <Text style={styles.etaDistance}>
+                  {liveEmergencyStatus === "Transporting"
+                    ? `Hospital Delivery: ${dispatchResult.hospitalDistanceKm} km • Destination: ${dispatchResult.assignedHospital?.name || "Hospital"}`
+                    : liveEmergencyStatus === "At Scene"
+                    ? `Paramedics at patient scene (${selectedLocation}). Preparing for hospital transfer.`
+                    : `Pickup: ${dispatchResult.ambulanceDistanceKm} km • Total Trip to Hospital: ${dispatchResult.totalTripDistanceKm} km (~${dispatchResult.totalEtaMinutes} mins)`}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.card}>
               <Text style={styles.cardHeader}>🚑 ASSIGNED AMBULANCE</Text>
@@ -616,7 +771,15 @@ export default function App() {
               patientLocation={selectedLocation}
               hospitalName={dispatchResult.assignedHospital?.name}
               hospitalLocation={dispatchResult.assignedHospital?.location}
-              activeStepIndex={trackingStepIndex}
+              activeStepIndex={
+                liveEmergencyStatus === "Completed"
+                  ? 999
+                  : liveEmergencyStatus === "Transporting"
+                  ? Math.max(trackingStepIndex, (dispatchResult.ambulanceRoute?.length || 2))
+                  : liveEmergencyStatus === "At Scene"
+                  ? Math.max(0, (dispatchResult.ambulanceRoute?.length || 2) - 1)
+                  : trackingStepIndex
+              }
               ambulanceId={dispatchResult.assignedAmbulance?.id}
               userRole="citizen"
               customCoords={locationCoords}
@@ -631,21 +794,21 @@ export default function App() {
                 ...(hospitalRoute.length > 1 ? hospitalRoute.slice(1) : [])
               ];
               const pickupStepsCount = pickupRoute.length;
-              const isArrivedAtPatient = trackingStepIndex >= pickupStepsCount - 1;
-              const isEnRouteToHospital = trackingStepIndex >= pickupStepsCount - 1 && trackingStepIndex < fullRoute.length - 1;
-              const isArrivedAtHospital = trackingStepIndex === fullRoute.length - 1;
+              const isArrivedAtPatient = liveEmergencyStatus === "At Scene" || trackingStepIndex >= pickupStepsCount - 1;
+              const isEnRouteToHospital = liveEmergencyStatus === "Transporting" || (trackingStepIndex >= pickupStepsCount - 1 && trackingStepIndex < fullRoute.length - 1);
+              const isArrivedAtHospital = liveEmergencyStatus === "Completed" || trackingStepIndex === fullRoute.length - 1;
 
               let phaseText = `En Route to Patient (${selectedLocation})`;
               let phaseBadgeColor = "#0284C7";
-              if (isArrivedAtHospital) {
+              if (isArrivedAtHospital || liveEmergencyStatus === "Completed") {
                 phaseText = `Arrived at ${dispatchResult.assignedHospital?.name || "Hospital"}`;
                 phaseBadgeColor = "#16A34A";
-              } else if (isEnRouteToHospital) {
+              } else if (isEnRouteToHospital || liveEmergencyStatus === "Transporting") {
                 phaseText = `Transporting to ${dispatchResult.assignedHospital?.name || "Hospital"}`;
-                phaseBadgeColor = "#16A34A";
-              } else if (isArrivedAtPatient) {
+                phaseBadgeColor = "#2563EB";
+              } else if (isArrivedAtPatient || liveEmergencyStatus === "At Scene") {
                 phaseText = `Arrived at Patient Scene (${selectedLocation})`;
-                phaseBadgeColor = "#EF4444";
+                phaseBadgeColor = "#D97706";
               }
 
               return (
@@ -817,11 +980,16 @@ export default function App() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
+              style={[
+                styles.cancelButton,
+                liveEmergencyStatus === "Completed" ? { backgroundColor: "#10B981" } : {}
+              ]}
+              onPress={liveEmergencyStatus === "Completed" ? handleDismissCompleted : handleCancel}
               activeOpacity={0.8}
             >
-              <Text style={styles.cancelButtonText}>CANCEL EMERGENCY CALL</Text>
+              <Text style={styles.cancelButtonText}>
+                {liveEmergencyStatus === "Completed" ? "CLOSE & NEW EMERGENCY" : "CANCEL EMERGENCY CALL"}
+              </Text>
             </TouchableOpacity>
           </ScrollView>
         )
@@ -1199,7 +1367,7 @@ export default function App() {
                       activeOpacity={0.8}
                     >
                       <Text style={styles.driverActionText}>
-                        {updatingDriver ? "Updating Status..." : "📍 Step 1: Arrived at Patient Scene"}
+                        {updatingDriver ? "Updating Status..." : "📍 Arrived at Scene"}
                       </Text>
                     </TouchableOpacity>
                   ) : null}
@@ -1216,7 +1384,7 @@ export default function App() {
                       activeOpacity={0.8}
                     >
                       <Text style={styles.driverActionText}>
-                        {updatingDriver ? "Updating Status..." : "🏥 Step 2: Depart Patient Scene ➔ En Route to Hospital"}
+                        {updatingDriver ? "Updating Status..." : "🏥 En Route to Hospital"}
                       </Text>
                     </TouchableOpacity>
                   ) : null}
@@ -1233,7 +1401,7 @@ export default function App() {
                       activeOpacity={0.8}
                     >
                       <Text style={styles.driverActionText}>
-                        {updatingDriver ? "Updating Status..." : "✓ Step 3: Arrived at Hospital & Complete Handover"}
+                        {updatingDriver ? "Completing Handover..." : "✓ Complete Handover"}
                       </Text>
                     </TouchableOpacity>
                   ) : null}
@@ -1859,15 +2027,17 @@ const styles = StyleSheet.create({
   },
   driverActionBtn: {
     paddingVertical: 13,
+    paddingHorizontal: 16,
     borderRadius: 10,
     alignItems: "center",
+    justifyContent: "center",
     ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
   },
   driverActionText: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 13,
-    letterSpacing: 0.5,
+    fontSize: 13.5,
+    letterSpacing: 0.3,
   },
   emptyMissionCard: {
     backgroundColor: "#FFFFFF",

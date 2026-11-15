@@ -79,7 +79,10 @@ export default function LiveVisualMap({
   };
 
   // Determine current vehicle target position based on activeStepIndex
-  const currentSector = fullRoute[activeStepIndex] || fullRoute[0] || pickupRoute[0] || "Gulshan";
+  const currentSector =
+    activeStepIndex >= fullRoute.length
+      ? fullRoute[fullRoute.length - 1] || "Gulshan"
+      : fullRoute[activeStepIndex] || fullRoute[0] || pickupRoute[0] || "Gulshan";
   const targetCoord = getCoord(currentSector);
 
   // Animated vehicle position for smooth gliding between nodes
