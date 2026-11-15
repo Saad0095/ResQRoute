@@ -1093,15 +1093,49 @@ export default function App() {
               </TouchableOpacity>
 
               <View style={styles.demoDivider}>
-                <Text style={styles.demoDividerText}>OR ONE-CLICK DEMO</Text>
+                <Text style={styles.demoDividerText}>OR SELECT DEMO AMBULANCE DRIVER</Text>
               </View>
 
-              <TouchableOpacity
-                style={styles.demoBtn}
-                onPress={() => handleDriverLogin("driver102@resqroute.org", "driver123")}
-              >
-                <Text style={styles.demoBtnText}>⚡ Demo Login: Driver #102 (Ahmed Raza)</Text>
-              </TouchableOpacity>
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {[
+                  { unit: 101, name: "Ali Khan", email: "driver101@resqroute.org", location: "North Karachi" },
+                  { unit: 102, name: "Ahmed Raza", email: "driver102@resqroute.org", location: "Gulshan" },
+                  { unit: 103, name: "Usman Sheikh", email: "driver103@resqroute.org", location: "Nazimabad" },
+                  { unit: 104, name: "Tariq Jameel", email: "driver104@resqroute.org", location: "Saddar" },
+                  { unit: 105, name: "Hamza Qureshi", email: "driver105@resqroute.org", location: "Clifton" },
+                ].map((d) => (
+                  <TouchableOpacity
+                    key={d.unit}
+                    style={{
+                      backgroundColor: "#F8FAFC",
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      ...(Platform.OS === "web" ? { cursor: "pointer", userSelect: "none" } : {}),
+                    }}
+                    onPress={() => handleDriverLogin(d.email, "driver123")}
+                  >
+                    <View>
+                      <Text style={{ fontSize: 13, fontWeight: "bold", color: "#0F172A" }}>
+                        🚑 Unit #{d.unit} - {d.name}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: "#64748B", marginTop: 1 }}>
+                        {d.email}
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#BFDBFE", paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "600", color: "#2563EB" }}>
+                        📍 {d.location}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </ScrollView>
         ) : (

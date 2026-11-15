@@ -65,6 +65,22 @@ def init_and_seed_db():
                     ambulance_id=103
                 ),
                 UserDB(
+                    email="driver104@resqroute.org",
+                    hashed_password=hash_password("driver123"),
+                    full_name="Tariq Jameel",
+                    role="DRIVER",
+                    phone="+92 304 5550104",
+                    ambulance_id=104
+                ),
+                UserDB(
+                    email="driver105@resqroute.org",
+                    hashed_password=hash_password("driver123"),
+                    full_name="Hamza Qureshi",
+                    role="DRIVER",
+                    phone="+92 305 5550105",
+                    ambulance_id=105
+                ),
+                UserDB(
                     email="citizen@resqroute.org",
                     hashed_password=hash_password("citizen123"),
                     full_name="Zain Citizen",

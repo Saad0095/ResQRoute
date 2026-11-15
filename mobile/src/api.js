@@ -42,20 +42,29 @@ export async function loginDriver(email, password) {
     return data;
   } catch (err) {
     // Offline simulation demo fallback if server is unreachable
-    if (email.includes("102") || email === "driver102@resqroute.org") {
-      const mock = {
-        accessToken: "mock-jwt-driver-102",
-        user: {
-          id: 3,
-          email: "driver102@resqroute.org",
-          fullName: "Ahmed Raza",
-          role: "DRIVER",
-          phone: "+92 302 5550102",
-          ambulanceId: 102,
-        },
-      };
-      setDriverToken(mock.accessToken);
-      return mock;
+    const driverMocks = {
+      101: { id: 2, fullName: "Ali Khan", ambulanceId: 101, phone: "+92 301 5550101", location: "North Karachi" },
+      102: { id: 3, fullName: "Ahmed Raza", ambulanceId: 102, phone: "+92 302 5550102", location: "Gulshan" },
+      103: { id: 4, fullName: "Usman Sheikh", ambulanceId: 103, phone: "+92 303 5550103", location: "Nazimabad" },
+      104: { id: 5, fullName: "Tariq Jameel", ambulanceId: 104, phone: "+92 304 5550104", location: "Saddar" },
+      105: { id: 6, fullName: "Hamza Qureshi", ambulanceId: 105, phone: "+92 305 5550105", location: "Clifton" },
+    };
+    for (const [id, d] of Object.entries(driverMocks)) {
+      if (email.includes(id)) {
+        const mock = {
+          accessToken: `mock-jwt-driver-${id}`,
+          user: {
+            id: d.id,
+            email: `driver${id}@resqroute.org`,
+            fullName: d.fullName,
+            role: "DRIVER",
+            phone: d.phone,
+            ambulanceId: parseInt(id),
+          },
+        };
+        setDriverToken(mock.accessToken);
+        return mock;
+      }
     }
     throw err;
   }
