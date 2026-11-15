@@ -190,19 +190,28 @@ export default function App() {
     }
   };
 
-  // Live Vehicle Progress Tracker: Advances ambulance along route waypoints in real time
+  // Live Vehicle Progress Tracker: Advances ambulance along full 2-stage route in real time
   useEffect(() => {
     let progressTimer;
-    if (dispatchResult && dispatchResult.ambulanceRoute && dispatchResult.ambulanceRoute.length > 1) {
-      setTrackingStepIndex(0);
-      progressTimer = setInterval(() => {
-        setTrackingStepIndex((prev) => {
-          if (prev < dispatchResult.ambulanceRoute.length - 1) {
-            return prev + 1;
-          }
-          return prev;
-        });
-      }, 5000); // Advances one road node every 5 seconds for demonstration
+    if (dispatchResult) {
+      const pickup = dispatchResult.ambulanceRoute || [];
+      const hosp = dispatchResult.hospitalRoute || [];
+      const fullRoute = [
+        ...pickup,
+        ...(hosp.length > 1 ? hosp.slice(1) : [])
+      ];
+
+      if (fullRoute.length > 1) {
+        setTrackingStepIndex(0);
+        progressTimer = setInterval(() => {
+          setTrackingStepIndex((prev) => {
+            if (prev < fullRoute.length - 1) {
+              return prev + 1;
+            }
+            return prev;
+          });
+        }, 4000); // Advances one road node every 4 seconds for live demonstration
+      }
     }
     return () => clearInterval(progressTimer);
   }, [dispatchResult]);
@@ -545,13 +554,13 @@ export default function App() {
             </View>
 
             <View style={styles.etaCard}>
-              <Text style={styles.etaLabel}>ESTIMATED ARRIVAL TIME</Text>
+              <Text style={styles.etaLabel}>ESTIMATED VEHICLE ARRIVAL AT SCENE</Text>
               <View style={styles.etaRow}>
                 <Text style={styles.etaValue}>{remainingEta}</Text>
                 <Text style={styles.etaUnit}>MINS</Text>
               </View>
               <Text style={styles.etaDistance}>
-                Distance: {dispatchResult.ambulanceDistanceKm} km • Direct Shortest Route
+                Pickup: {dispatchResult.ambulanceDistanceKm} km • Total Trip to Hospital: {dispatchResult.totalTripDistanceKm} km (~{dispatchResult.totalEtaMinutes} mins)
               </Text>
             </View>
 
@@ -582,7 +591,7 @@ export default function App() {
               <View style={styles.cardRow}>
                 <Text style={styles.cardKey}>Facility:</Text>
                 <Text style={styles.cardValHighlight}>
-                  {dispatchResult.assignedHospital?.name}
+                  {dispatchResult.assignedHospital?.name} ({dispatchResult.assignedHospital?.location})
                 </Text>
               </View>
               <View style={styles.cardRow}>
@@ -593,67 +602,162 @@ export default function App() {
               </View>
             </View>
 
-            <View style={styles.card}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <Text style={styles.cardHeader}>🛣️ LIVE VEHICLE TRACKING</Text>
-                <Text style={{ color: "#10B981", fontSize: 11, fontWeight: "bold" }}>
-                  ● Moving
-                </Text>
-              </View>
+            {/* COMPLETE 2-STAGE LIVE TRIP TRACKER */}
+            {(() => {
+              const pickupRoute = dispatchResult.ambulanceRoute || [];
+              const hospitalRoute = dispatchResult.hospitalRoute || [];
+              const fullRoute = [
+                ...pickupRoute,
+                ...(hospitalRoute.length > 1 ? hospitalRoute.slice(1) : [])
+              ];
+              const pickupStepsCount = pickupRoute.length;
+              const isArrivedAtPatient = trackingStepIndex >= pickupStepsCount - 1;
+              const isEnRouteToHospital = trackingStepIndex >= pickupStepsCount - 1 && trackingStepIndex < fullRoute.length - 1;
+              const isArrivedAtHospital = trackingStepIndex === fullRoute.length - 1;
 
-              {/* Waypoint progress tracker */}
-              <View style={styles.routeContainer}>
-                {dispatchResult.ambulanceRoute?.map((node, index) => {
-                  const isCurrent = index === trackingStepIndex;
-                  const isPassed = index < trackingStepIndex;
-                  return (
-                    <View key={index} style={styles.routeStep}>
-                      <View
-                        style={[
-                          styles.stepCircle,
-                          isCurrent
-                            ? { backgroundColor: "#EF4444", transform: [{ scale: 1.15 }] }
-                            : isPassed
-                            ? { backgroundColor: "#10B981" }
-                            : { backgroundColor: "#334155" },
-                        ]}
-                      >
-                        <Text style={styles.stepNum}>
-                          {isCurrent ? "🚑" : isPassed ? "✓" : index + 1}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.stepText,
-                          isCurrent && { color: "#FFFFFF", fontWeight: "bold" },
-                        ]}
-                      >
-                        {node}
+              let phaseText = `En Route to Patient (${selectedLocation})`;
+              let phaseBadgeColor = "#0284C7";
+              if (isArrivedAtHospital) {
+                phaseText = `Arrived at ${dispatchResult.assignedHospital?.name || "Hospital"}`;
+                phaseBadgeColor = "#16A34A";
+              } else if (isEnRouteToHospital) {
+                phaseText = `Transporting to ${dispatchResult.assignedHospital?.name || "Hospital"}`;
+                phaseBadgeColor = "#16A34A";
+              } else if (isArrivedAtPatient) {
+                phaseText = `Arrived at Patient Scene (${selectedLocation})`;
+                phaseBadgeColor = "#EF4444";
+              }
+
+              return (
+                <View style={styles.card}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <Text style={styles.cardHeader}>🗺️ LIVE 2-STAGE JOURNEY TRACKER</Text>
+                    <Text style={{ color: phaseBadgeColor, fontSize: 11, fontWeight: "bold" }}>
+                      ● Tracking
+                    </Text>
+                  </View>
+
+                  {/* Status Banner */}
+                  <View style={{ marginBottom: 12, padding: 9, borderRadius: 8, backgroundColor: phaseBadgeColor + "15", borderWidth: 1, borderColor: phaseBadgeColor + "60" }}>
+                    <Text style={{ color: phaseBadgeColor, fontSize: 11, fontWeight: "bold" }}>
+                      ● STATUS: {phaseText.toUpperCase()}
+                    </Text>
+                    <Text style={{ color: "#334155", fontSize: 11, marginTop: 3 }}>
+                      Current Vehicle Sector: <Text style={{ fontWeight: "bold", color: "#0F172A" }}>{fullRoute[trackingStepIndex] || selectedLocation}</Text>
+                    </Text>
+                  </View>
+
+                  {/* Stage 1: Ambulance to Patient */}
+                  <View style={{ marginBottom: 14 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0284C7" }}>
+                        📍 STEP 1: Ambulance ➔ Patient ({selectedLocation})
                       </Text>
-                      {index < dispatchResult.ambulanceRoute.length - 1 && (
-                        <Text
-                          style={[
-                            styles.stepArrow,
-                            isPassed && { color: "#10B981" },
-                          ]}
-                        >
-                          ➔
-                        </Text>
-                      )}
+                      <Text style={{ fontSize: 10, color: "#64748B" }}>
+                        {dispatchResult.ambulanceDistanceKm} km • ~{dispatchResult.ambulanceEtaMinutes} mins
+                      </Text>
                     </View>
-                  );
-                })}
-              </View>
+                    <View style={styles.routeContainer}>
+                      {pickupRoute.map((node, index) => {
+                        const isCurrent = index === trackingStepIndex;
+                        const isPassed = trackingStepIndex > index;
+                        return (
+                          <View key={`pickup-${index}`} style={styles.routeStep}>
+                            <View
+                              style={[
+                                styles.stepCircle,
+                                isCurrent
+                                  ? { backgroundColor: "#EF4444", transform: [{ scale: 1.15 }] }
+                                  : isPassed
+                                  ? { backgroundColor: "#10B981" }
+                                  : { backgroundColor: "#CBD5E1" },
+                              ]}
+                            >
+                              <Text style={styles.stepNum}>
+                                {isCurrent ? "🚑" : isPassed ? "✓" : index + 1}
+                              </Text>
+                            </View>
+                            <Text
+                              style={[
+                                styles.stepText,
+                                isCurrent && { color: "#EF4444", fontWeight: "bold" },
+                              ]}
+                            >
+                              {node}
+                            </Text>
+                            {index < pickupRoute.length - 1 && (
+                              <Text
+                                style={[
+                                  styles.stepArrow,
+                                  isPassed && { color: "#10B981" },
+                                ]}
+                              >
+                                ➔
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
 
-              <View style={{ marginTop: 12, padding: 10, backgroundColor: "#1E293B", borderRadius: 8 }}>
-                <Text style={{ color: "#94A3B8", fontSize: 11 }} selectable={true}>
-                  Current Position: <Text style={{ color: "#38BDF8", fontWeight: "bold" }}>{dispatchResult.ambulanceRoute[trackingStepIndex] || selectedLocation}</Text>
-                </Text>
-                <Text style={{ color: "#94A3B8", fontSize: 11, marginTop: 2 }} selectable={true}>
-                  Heading to: <Text style={{ color: "#FFFFFF", fontWeight: "bold" }}>{selectedLocation}</Text>
-                </Text>
-              </View>
-            </View>
+                  {/* Stage 2: Patient to Hospital */}
+                  <View style={{ marginBottom: 6 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#16A34A" }}>
+                        🏥 STEP 2: Patient ➔ {dispatchResult.assignedHospital?.name || "Hospital"}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: "#64748B" }}>
+                        {dispatchResult.hospitalDistanceKm} km • ~{dispatchResult.hospitalEtaMinutes} mins
+                      </Text>
+                    </View>
+                    <View style={styles.routeContainer}>
+                      {hospitalRoute.map((node, index) => {
+                        const routeOffsetIndex = (pickupRoute.length - 1) + index;
+                        const isCurrent = trackingStepIndex === routeOffsetIndex;
+                        const isPassed = trackingStepIndex > routeOffsetIndex;
+                        return (
+                          <View key={`hosp-${index}`} style={styles.routeStep}>
+                            <View
+                              style={[
+                                styles.stepCircle,
+                                isCurrent
+                                  ? { backgroundColor: "#16A34A", transform: [{ scale: 1.15 }] }
+                                  : isPassed
+                                  ? { backgroundColor: "#10B981" }
+                                  : { backgroundColor: "#CBD5E1" },
+                              ]}
+                            >
+                              <Text style={styles.stepNum}>
+                                {isCurrent ? "🚑" : isPassed ? "✓" : index + 1}
+                              </Text>
+                            </View>
+                            <Text
+                              style={[
+                                styles.stepText,
+                                isCurrent && { color: "#16A34A", fontWeight: "bold" },
+                              ]}
+                            >
+                              {node}
+                            </Text>
+                            {index < hospitalRoute.length - 1 && (
+                              <Text
+                                style={[
+                                  styles.stepArrow,
+                                  isPassed && { color: "#10B981" },
+                                ]}
+                              >
+                                ➔
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
 
             <TouchableOpacity
               style={{
@@ -670,15 +774,25 @@ export default function App() {
                 gap: 8,
               }}
               onPress={() => {
-                const text = `Emergency Call #${dispatchResult.emergencyId}\nAssigned Unit: Ambulance #${dispatchResult.assignedAmbulance?.id} (${dispatchResult.assignedAmbulance?.driverName}, Phone: ${dispatchResult.assignedAmbulance?.phone})\nDestination: ${dispatchResult.assignedHospital?.name}\nRoute: ${dispatchResult.ambulanceRoute?.join(" → ")} (${dispatchResult.ambulanceDistanceKm} km)`;
+                const text = [
+                  `🚨 EMERGENCY CALL SUMMARY #${dispatchResult.emergencyId}`,
+                  `Assigned Ambulance: Unit #${dispatchResult.assignedAmbulance?.id} (${dispatchResult.assignedAmbulance?.driverName}, Phone: ${dispatchResult.assignedAmbulance?.phone})`,
+                  `Patient Sector: ${selectedLocation}`,
+                  ``,
+                  `📍 STEP 1 (Pickup Route): ${dispatchResult.ambulanceRoute?.join(" ➔ ")} (${dispatchResult.ambulanceDistanceKm} km, ~${dispatchResult.ambulanceEtaMinutes} mins)`,
+                  `🏥 STEP 2 (Hospital Delivery Route): ${dispatchResult.hospitalRoute?.join(" ➔ ")} (${dispatchResult.hospitalDistanceKm} km, ~${dispatchResult.hospitalEtaMinutes} mins)`,
+                  `Destination Hospital: ${dispatchResult.assignedHospital?.name} (${dispatchResult.assignedHospital?.location})`,
+                  ``,
+                  `🛣️ TOTAL SHORTEST PATH TRIP: ${dispatchResult.totalTripDistanceKm} km • Total Journey Time: ~${dispatchResult.totalEtaMinutes} mins`,
+                ].join("\n");
                 if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
                   navigator.clipboard.writeText(text);
                 }
-                showAlert("Copied", "Emergency details & navigation route copied to clipboard!");
+                showAlert("Copied", "Complete 2-stage emergency route copied to clipboard!");
               }}
             >
               <Text style={{ fontSize: 14 }}>📋</Text>
-              <Text style={{ color: "#E2E8F0", fontSize: 12, fontWeight: "600" }}>Copy Emergency & Route Details</Text>
+              <Text style={{ color: "#E2E8F0", fontSize: 12, fontWeight: "600" }}>Copy Complete 2-Stage Route & Details</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -823,34 +937,84 @@ export default function App() {
                 </View>
 
                 <View style={styles.card}>
-                  <Text style={styles.cardHeader}>🗺️ FASTEST TURN-BY-TURN ROUTE TO HOSPITAL</Text>
-                  <Text style={{ fontSize: 11, color: "#64748B", marginBottom: 10 }}>
-                    Navigation route passing designated sectors directly to {driverMission.hospitalName}:
-                  </Text>
-                  <View style={styles.routeContainer}>
-                    {driverMission.route?.map((step, idx) => (
-                      <View key={idx} style={styles.routeStep}>
-                        <View style={[
-                          styles.stepCircle,
-                          idx === 0
-                            ? { backgroundColor: "#2563EB" }
-                            : idx === driverMission.route.length - 1
-                            ? { backgroundColor: "#16A34A" }
-                            : {}
-                        ]}>
-                          <Text style={styles.stepNum}>{idx + 1}</Text>
-                        </View>
-                        <Text style={[
-                          styles.stepText,
-                          idx === driverMission.route.length - 1 ? { fontWeight: "bold", color: "#16A34A" } : {}
-                        ]}>
-                          {step}
+                  <Text style={styles.cardHeader}>🗺️ 2-STAGE FASTEST EMERGENCY ROUTE</Text>
+                  
+                  {/* Stage 1: To Patient */}
+                  <View style={{ marginBottom: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#E2E8F0" }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#0284C7" }}>
+                        📍 STAGE 1: Pickup Route (Base ➔ Patient)
+                      </Text>
+                      {driverMission.ambulanceDistanceKm && (
+                        <Text style={{ fontSize: 10, color: "#64748B" }}>
+                          {driverMission.ambulanceDistanceKm} km • ~{driverMission.ambulanceEtaMinutes} mins
                         </Text>
-                        {idx < driverMission.route.length - 1 && (
-                          <Text style={styles.stepArrow}>➔</Text>
-                        )}
-                      </View>
-                    ))}
+                      )}
+                    </View>
+                    <View style={styles.routeContainer}>
+                      {(driverMission.ambulanceRoute || [driverLocation, driverMission.patientLocation]).map((step, idx, arr) => (
+                        <View key={`drv-p-${idx}`} style={styles.routeStep}>
+                          <View style={[
+                            styles.stepCircle,
+                            idx === 0
+                              ? { backgroundColor: "#2563EB" }
+                              : idx === arr.length - 1
+                              ? { backgroundColor: "#DC2626" }
+                              : { backgroundColor: "#38BDF8" }
+                          ]}>
+                            <Text style={styles.stepNum}>{idx === arr.length - 1 ? "📍" : idx + 1}</Text>
+                          </View>
+                          <Text style={[
+                            styles.stepText,
+                            idx === arr.length - 1 ? { fontWeight: "bold", color: "#DC2626" } : {}
+                          ]}>
+                            {step}
+                          </Text>
+                          {idx < arr.length - 1 && (
+                            <Text style={styles.stepArrow}>➔</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Stage 2: To Hospital */}
+                  <View style={{ marginBottom: 6 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "bold", color: "#16A34A" }}>
+                        🏥 STAGE 2: Emergency Delivery (Patient ➔ Hospital)
+                      </Text>
+                      {driverMission.hospitalDistanceKm && (
+                        <Text style={{ fontSize: 10, color: "#64748B" }}>
+                          {driverMission.hospitalDistanceKm} km • ~{driverMission.hospitalEtaMinutes} mins
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.routeContainer}>
+                      {(driverMission.hospitalRoute || [driverMission.patientLocation, driverMission.hospitalLocation]).map((step, idx, arr) => (
+                        <View key={`drv-h-${idx}`} style={styles.routeStep}>
+                          <View style={[
+                            styles.stepCircle,
+                            idx === 0
+                              ? { backgroundColor: "#DC2626" }
+                              : idx === arr.length - 1
+                              ? { backgroundColor: "#16A34A" }
+                              : { backgroundColor: "#4ADE80" }
+                          ]}>
+                            <Text style={styles.stepNum}>{idx === arr.length - 1 ? "🏥" : idx + 1}</Text>
+                          </View>
+                          <Text style={[
+                            styles.stepText,
+                            idx === arr.length - 1 ? { fontWeight: "bold", color: "#16A34A" } : {}
+                          ]}>
+                            {step}
+                          </Text>
+                          {idx < arr.length - 1 && (
+                            <Text style={styles.stepArrow}>➔</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
 
                   <TouchableOpacity
@@ -868,7 +1032,17 @@ export default function App() {
                       gap: 6,
                     }}
                     onPress={() => {
-                      const text = `Emergency Incident #${driverMission.emergencyId}\nPatient Sector: ${driverMission.patientLocation}\nDestination Hospital: ${driverMission.hospitalName} (${driverMission.hospitalLocation})\nRoute: ${driverMission.route?.join(" → ")}`;
+                      const text = [
+                        `🚨 MISSION NAVIGATION DISPATCH #${driverMission.emergencyId}`,
+                        `Urgency: ${driverMission.severity}`,
+                        `Patient Sector: ${driverMission.patientLocation}`,
+                        `Destination Hospital: ${driverMission.hospitalName} (${driverMission.hospitalLocation})`,
+                        ``,
+                        `📍 STAGE 1 (Pickup Route): ${(driverMission.ambulanceRoute || [driverLocation, driverMission.patientLocation]).join(" ➔ ")}`,
+                        `🏥 STAGE 2 (Hospital Delivery Route): ${(driverMission.hospitalRoute || [driverMission.patientLocation, driverMission.hospitalLocation]).join(" ➔ ")}`,
+                        ``,
+                        `🛣️ Full Route: ${driverMission.route?.join(" ➔ ")}`,
+                      ].join("\n");
                       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
                         navigator.clipboard.writeText(text);
                       }
@@ -876,7 +1050,7 @@ export default function App() {
                     }}
                   >
                     <Text style={{ fontSize: 13 }}>📋</Text>
-                    <Text style={{ color: "#334155", fontSize: 11, fontWeight: "600" }}>Copy Navigation Route & Hospital</Text>
+                    <Text style={{ color: "#334155", fontSize: 11, fontWeight: "600" }}>Copy Complete 2-Stage Navigation</Text>
                   </TouchableOpacity>
                 </View>
 

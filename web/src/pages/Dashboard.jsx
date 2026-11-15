@@ -134,9 +134,14 @@ export default function Dashboard({ user, onLogout }) {
       });
 
       if (res.success) {
-        setActiveRoute(res.ambulanceRoute);
+        const fullRoute = [
+          ...(res.ambulanceRoute || []),
+          ...(res.hospitalRoute && res.hospitalRoute.length > 1 ? res.hospitalRoute.slice(1) : [])
+        ];
+        setActiveRoute(fullRoute);
         setActiveDispatch(res);
-        showMsg(`Ambulance #${res.assignedAmbulance.id} dispatched! ETA: ${res.ambulanceEtaMinutes} mins.`);
+        setActiveTab("map");
+        showMsg(`Ambulance #${res.assignedAmbulance.id} dispatched! Pickup: ${res.ambulanceEtaMinutes} mins ➔ Hospital: ${res.hospitalEtaMinutes} mins.`);
         setPatientName("");
       } else {
         showMsg(res.message, true);
@@ -660,7 +665,39 @@ export default function Dashboard({ user, onLogout }) {
                         <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-1">
                           Current Location: <strong className="text-slate-900 dark:text-white">{amb.location}</strong>
                         </div>
-                        <div className="mt-3 flex justify-end">
+                        <div className="mt-3 flex justify-end gap-2">
+                          {amb.currentMission && (
+                            <button
+                              onClick={() => {
+                                const mission = amb.currentMission;
+                                const dispatchObj = state?.recentDispatches?.find((d) => d.emergencyId === mission.emergencyId) || {
+                                  assignedAmbulance: amb,
+                                  emergencyId: mission.emergencyId,
+                                  severityLabel: mission.severity || "Critical",
+                                  patientLocation: mission.patientLocation,
+                                  ambulanceRoute: mission.ambulanceRoute || [amb.location, mission.patientLocation],
+                                  ambulanceDistanceKm: mission.ambulanceDistanceKm || 5.0,
+                                  ambulanceEtaMinutes: mission.ambulanceEtaMinutes || 6,
+                                  assignedHospital: { name: mission.hospitalName, location: mission.hospitalLocation },
+                                  hospitalRoute: mission.hospitalRoute || [mission.patientLocation, mission.hospitalLocation],
+                                  hospitalDistanceKm: mission.hospitalDistanceKm || 5.0,
+                                  hospitalEtaMinutes: mission.hospitalEtaMinutes || 6,
+                                  totalTripDistanceKm: mission.totalTripDistanceKm || 10.0,
+                                  totalEtaMinutes: mission.totalEtaMinutes || 12,
+                                };
+                                const fullRoute = [
+                                  ...(dispatchObj.ambulanceRoute || []),
+                                  ...(dispatchObj.hospitalRoute && dispatchObj.hospitalRoute.length > 1 ? dispatchObj.hospitalRoute.slice(1) : [])
+                                ];
+                                setActiveDispatch(dispatchObj);
+                                setActiveRoute(fullRoute.length > 0 ? fullRoute : mission.route);
+                                setActiveTab("map");
+                              }}
+                              className="text-[11px] px-2.5 py-1 rounded bg-sky-600 hover:bg-sky-700 text-white font-medium transition"
+                            >
+                              🎯 Live Track
+                            </button>
+                          )}
                           <button
                             onClick={() => handleFreeAmbulance(amb.id)}
                             className="text-[11px] px-2.5 py-1 rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
@@ -877,6 +914,10 @@ export default function Dashboard({ user, onLogout }) {
                 state={state}
                 activeRoute={activeRoute}
                 activeDispatch={activeDispatch}
+                onClearRoute={() => {
+                  setActiveRoute([]);
+                  setActiveDispatch(null);
+                }}
               />
 
               <RoadControls

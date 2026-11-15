@@ -346,8 +346,16 @@ def trigger_sos(request: SOSRequest):
         "severity": sev_label,
         "hospitalName": best_hospital.name if best_hospital else "Nearest Clinic",
         "hospitalLocation": best_hospital.location if best_hospital else patient_loc,
+        "ambulanceRoute": best_amb_path,
+        "ambulanceDistanceKm": round(best_amb_dist, 1),
+        "ambulanceEtaMinutes": amb_eta,
+        "hospitalRoute": best_hosp_path,
+        "hospitalDistanceKm": round(best_hosp_dist, 1) if best_hospital else 0.0,
+        "hospitalEtaMinutes": hosp_eta,
         "route": best_amb_path + (best_hosp_path[1:] if best_hosp_path else []),
         "eta": amb_eta,
+        "totalTripDistanceKm": total_dist,
+        "totalEtaMinutes": total_eta,
     }
     best_ambulance.currentMission = mission_info
 
@@ -418,6 +426,15 @@ def update_ambulance_status(amb_id: int, req: DriverStatusUpdate):
         if amb.id == amb_id:
             amb.status = req.status
             mission_id = amb.currentMission.get("emergencyId") if amb.currentMission else None
+
+            # Dynamically update vehicle location as mission progresses
+            if amb.currentMission:
+                if req.status in ["At Scene", "At Patient"]:
+                    amb.location = amb.currentMission.get("patientLocation", amb.location)
+                elif req.status in ["Completed", "Available"]:
+                    hosp_loc = amb.currentMission.get("hospitalLocation")
+                    if hosp_loc:
+                        amb.location = hosp_loc
             
             if req.status in ["Completed", "Available"]:
                 amb.isAvailable = True
