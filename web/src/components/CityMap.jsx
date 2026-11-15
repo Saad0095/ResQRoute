@@ -1,14 +1,16 @@
 import React, { useEffect, useRef } from "react";
 import { useTheme } from "../context/ThemeContext";
 
-const nodeCoords = {
-  "North Karachi": { x: 180, y: 70 },
-  "Nazimabad":     { x: 150, y: 190 },
-  "Gulshan":       { x: 420, y: 140 },
-  "Saddar":        { x: 270, y: 290 },
-  "Airport":       { x: 700, y: 180 },
-  "Clifton":       { x: 200, y: 400 },
-  "Defense":       { x: 490, y: 380 },
+const defaultNodeCoords = {
+  "North Karachi":    { x: 180, y: 70 },
+  "Nazimabad":        { x: 150, y: 190 },
+  "Gulshan":          { x: 420, y: 140 },
+  "Saddar":           { x: 270, y: 290 },
+  "Airport":          { x: 670, y: 170 },
+  "Malir":            { x: 770, y: 130 },
+  "Shahrah-e-Faisal": { x: 480, y: 260 },
+  "Clifton":          { x: 200, y: 400 },
+  "Defense":          { x: 490, y: 390 },
 };
 
 export default function CityMap({ state, activeRoute, activeDispatch }) {
@@ -25,10 +27,28 @@ export default function CityMap({ state, activeRoute, activeDispatch }) {
 
     if (!state || !state.roads) return;
 
+    // Merge coordinates with backend custom node coordinates if present
+    const coordsMap = { ...defaultNodeCoords, ...(state.coords || {}) };
+
+    const getCoord = (zone) => {
+      if (coordsMap[zone]) return coordsMap[zone];
+      // Deterministic fallback for dynamically created zones without explicit x,y
+      let hash = 0;
+      for (let i = 0; i < zone.length; i++) {
+        hash = (hash << 5) - hash + zone.charCodeAt(i);
+      }
+      const angle = (Math.abs(hash) % 360) * (Math.PI / 180);
+      const radius = 130 + (Math.abs(hash) % 70);
+      const x = Math.max(60, Math.min(800, 450 + Math.cos(angle) * radius));
+      const y = Math.max(60, Math.min(410, 240 + Math.sin(angle) * radius));
+      coordsMap[zone] = { x: Math.round(x), y: Math.round(y) };
+      return coordsMap[zone];
+    };
+
     // 1. Draw Roads
     state.roads.forEach((r) => {
-      const p1 = nodeCoords[r.u];
-      const p2 = nodeCoords[r.v];
+      const p1 = getCoord(r.u);
+      const p2 = getCoord(r.v);
       if (!p1 || !p2) return;
 
       ctx.beginPath();
@@ -59,7 +79,7 @@ export default function CityMap({ state, activeRoute, activeDispatch }) {
     if (activeRoute && activeRoute.length > 1) {
       ctx.beginPath();
       for (let i = 0; i < activeRoute.length; i++) {
-        const pt = nodeCoords[activeRoute[i]];
+        const pt = getCoord(activeRoute[i]);
         if (!pt) continue;
         if (i === 0) ctx.moveTo(pt.x, pt.y);
         else ctx.lineTo(pt.x, pt.y);
@@ -69,9 +89,17 @@ export default function CityMap({ state, activeRoute, activeDispatch }) {
       ctx.stroke();
     }
 
-    // 3. Draw Nodes
-    Object.keys(nodeCoords).forEach((zone) => {
-      const { x, y } = nodeCoords[zone];
+    // 3. Draw Nodes (All available zones in state or roads)
+    const allZones = Array.from(
+      new Set([
+        ...(state.availableZones || []),
+        ...state.roads.flatMap((r) => [r.u, r.v]),
+        ...Object.keys(coordsMap),
+      ])
+    );
+
+    allZones.forEach((zone) => {
+      const { x, y } = getCoord(zone);
       const hasAmbulance = state.ambulances?.some(
         (a) => a.location === zone && a.isAvailable
       );

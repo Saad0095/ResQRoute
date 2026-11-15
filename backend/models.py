@@ -52,3 +52,17 @@ class RoadToggleRequest(BaseModel):
 
 class DriverStatusUpdate(BaseModel):
     status: str  # "En Route", "At Scene", "Transporting", "Completed"
+
+
+class AddLocationRequest(BaseModel):
+    name: str
+    connectedTo: Optional[str] = None
+    distanceKm: Optional[float] = 5.0
+    x: Optional[int] = None
+    y: Optional[int] = None
+
+
+class AddRoadRequest(BaseModel):
+    u: str
+    v: str
+    weight: float

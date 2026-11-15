@@ -29,6 +29,9 @@ class CityGraph:
         """Add bidirectional road between zones u and v with given distance/time."""
         self.add_node(u)
         self.add_node(v)
+        # Avoid duplicate edges: replace existing weight if already present
+        self.adj_list[u] = [(neighbor, w) for neighbor, w in self.adj_list[u] if neighbor != v]
+        self.adj_list[v] = [(neighbor, w) for neighbor, w in self.adj_list[v] if neighbor != u]
         self.adj_list[u].append((v, weight))
         self.adj_list[v].append((u, weight))
 
@@ -149,7 +152,14 @@ def build_default_city_map() -> CityGraph:
         ("Clifton", "Defense", 5.0),
         ("Saddar", "Defense", 6.5),
         ("Airport", "Defense", 14.0),
-        ("Gulshan", "Defense", 12.0)
+        ("Gulshan", "Defense", 12.0),
+        # Karachi Arterial Network (Malir <-> Shahrah-e-Faisal <-> Saddar)
+        ("Malir", "Airport", 5.0),
+        ("Malir", "Shahrah-e-Faisal", 8.0),
+        ("Airport", "Shahrah-e-Faisal", 6.0),
+        ("Shahrah-e-Faisal", "Gulshan", 5.5),
+        ("Shahrah-e-Faisal", "Saddar", 7.0),
+        ("Shahrah-e-Faisal", "Defense", 6.0),
     ]
 
     for u, v, w in roads:

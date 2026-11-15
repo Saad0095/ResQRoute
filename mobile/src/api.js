@@ -1,6 +1,15 @@
-// Configuration: For testing on a physical phone via Expo Go,
-// replace 'localhost' with your computer's local Wi-Fi IP (e.g., 'http://192.168.1.15:8000')
-export const API_BASE_URL = "http://localhost:8000";
+// Configuration: Live production backend on Render
+export let API_BASE_URL = "https://resqroute-cq1x.onrender.com";
+
+export function setApiBaseUrl(url) {
+  if (url) {
+    API_BASE_URL = url.trim().replace(/\/+$/, "");
+  }
+}
+
+export function getApiBaseUrl() {
+  return API_BASE_URL;
+}
 
 let driverAuthToken = null;
 
@@ -135,6 +144,8 @@ export async function fetchLocations() {
       "Clifton",
       "Defense",
       "Airport",
+      "Malir",
+      "Shahrah-e-Faisal",
     ];
   }
 }

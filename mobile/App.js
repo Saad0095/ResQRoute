@@ -23,6 +23,8 @@ import {
   updateAmbulanceStatus,
   loginDriver,
   setDriverToken,
+  getApiBaseUrl,
+  setApiBaseUrl,
 } from "./src/api";
 import { theme } from "./src/theme";
 
@@ -43,6 +45,8 @@ export default function App() {
     "Clifton",
     "Defense",
     "Airport",
+    "Malir",
+    "Shahrah-e-Faisal",
   ]);
   const [severity, setSeverity] = useState(4); // 4 = Critical, 3 = High, 2 = Medium
   const [loading, setLoading] = useState(false);
@@ -64,8 +68,13 @@ export default function App() {
   const [driverAmbId, setDriverAmbId] = useState(102);
   const [driverMission, setDriverMission] = useState(null);
   const [driverStatus, setDriverStatus] = useState("Available");
+  const [driverLocation, setDriverLocation] = useState("Gulshan");
   const [isOnDuty, setIsOnDuty] = useState(true);
   const [updatingDriver, setUpdatingDriver] = useState(false);
+
+  // Server Connection Configuration
+  const [showServerModal, setShowServerModal] = useState(false);
+  const [serverUrlInput, setServerUrlInput] = useState(getApiBaseUrl());
 
   // Concentric Pulse animations for the SOS button
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -152,6 +161,8 @@ export default function App() {
             { name: "Nazimabad", lat: 24.9180, lng: 67.0332 },
             { name: "North Karachi", lat: 24.9961, lng: 67.0620 },
             { name: "Airport", lat: 24.9056, lng: 67.1608 },
+            { name: "Shahrah-e-Faisal", lat: 24.8672, lng: 67.0822 },
+            { name: "Malir", lat: 24.8934, lng: 67.2023 },
           ];
 
           let closest = sectorMap[0];
@@ -206,6 +217,7 @@ export default function App() {
         if (data) {
           setDriverStatus(data.status);
           setDriverMission(data.currentMission);
+          if (data.location) setDriverLocation(data.location);
         }
       };
       checkMission();
@@ -332,6 +344,7 @@ export default function App() {
       if (data) {
         setDriverStatus(data.status);
         setDriverMission(data.currentMission);
+        if (data.location) setDriverLocation(data.location);
       }
     } catch (err) {
       showAlert("Error", "Could not update mission status. Please try again.");
@@ -356,6 +369,12 @@ export default function App() {
 
       {/* HEADER WITH ROLE SWITCHER */}
       <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => setShowServerModal(true)}
+          style={{ position: "absolute", top: 10, right: 14, padding: 6, zIndex: 10 }}
+        >
+          <Text style={{ fontSize: 16 }}>⚙️</Text>
+        </TouchableOpacity>
         <View style={styles.headerBadge}>
           <Text style={styles.headerBadgeText}>911 / 1122 RESQROUTE</Text>
         </View>
@@ -721,6 +740,9 @@ export default function App() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.driverNameText}>👤 {driverUser.fullName}</Text>
                 <Text style={styles.driverUnitText}>Vehicle Unit: Ambulance #{driverUser.ambulanceId || driverAmbId}</Text>
+                <Text style={[styles.driverUnitText, { color: "#2563EB", fontWeight: "600", marginTop: 2 }]}>
+                  Current Location: 📍 {driverLocation || "Stationed"}
+                </Text>
               </View>
 
               <View style={{ alignItems: "flex-end" }}>
@@ -753,6 +775,10 @@ export default function App() {
                     <Text style={styles.cardValHighlight}>{driverMission.emergencyId}</Text>
                   </View>
                   <View style={styles.cardRow}>
+                    <Text style={styles.cardKey}>Current Vehicle Sector:</Text>
+                    <Text style={styles.cardValHighlight}>🚑 {driverLocation || driverMission.route?.[0] || "En Route"}</Text>
+                  </View>
+                  <View style={styles.cardRow}>
                     <Text style={styles.cardKey}>Patient Sector:</Text>
                     <Text style={styles.cardValHighlight}>📍 {driverMission.patientLocation}</Text>
                   </View>
@@ -763,20 +789,37 @@ export default function App() {
                     </Text>
                   </View>
                   <View style={styles.cardRow}>
-                    <Text style={styles.cardKey}>Target Hospital:</Text>
-                    <Text style={styles.cardVal}>{driverMission.hospitalName}</Text>
+                    <Text style={styles.cardKey}>Destination Hospital:</Text>
+                    <Text style={[styles.cardVal, { color: "#16A34A", fontWeight: "bold" }]}>
+                      🏥 {driverMission.hospitalName} ({driverMission.hospitalLocation})
+                    </Text>
                   </View>
                 </View>
 
                 <View style={styles.card}>
-                  <Text style={styles.cardHeader}>🗺️ FASTEST NAVIGATION ROUTE</Text>
+                  <Text style={styles.cardHeader}>🗺️ FASTEST TURN-BY-TURN ROUTE TO HOSPITAL</Text>
+                  <Text style={{ fontSize: 11, color: "#64748B", marginBottom: 10 }}>
+                    Navigation route passing designated sectors directly to {driverMission.hospitalName}:
+                  </Text>
                   <View style={styles.routeContainer}>
                     {driverMission.route?.map((step, idx) => (
                       <View key={idx} style={styles.routeStep}>
-                        <View style={styles.stepCircle}>
+                        <View style={[
+                          styles.stepCircle,
+                          idx === 0
+                            ? { backgroundColor: "#2563EB" }
+                            : idx === driverMission.route.length - 1
+                            ? { backgroundColor: "#16A34A" }
+                            : {}
+                        ]}>
                           <Text style={styles.stepNum}>{idx + 1}</Text>
                         </View>
-                        <Text style={styles.stepText}>{step}</Text>
+                        <Text style={[
+                          styles.stepText,
+                          idx === driverMission.route.length - 1 ? { fontWeight: "bold", color: "#16A34A" } : {}
+                        ]}>
+                          {step}
+                        </Text>
                         {idx < driverMission.route.length - 1 && (
                           <Text style={styles.stepArrow}>➔</Text>
                         )}
@@ -818,7 +861,11 @@ export default function App() {
                 <Text style={{ fontSize: 44 }}>🟢</Text>
                 <Text style={styles.emptyMissionTitle}>Standing By</Text>
                 <Text style={styles.emptyMissionSubtitle}>
-                  Vehicle #{driverUser.ambulanceId || driverAmbId} is currently available in the fleet. When a citizen triggers SOS, the system will assign this unit automatically!
+                  Vehicle #{driverUser.ambulanceId || driverAmbId} is currently stationed at{" "}
+                  <Text style={{ fontWeight: "bold", color: "#0F172A" }}>📍 {driverLocation || "Base Station"}</Text> and available in the fleet.
+                </Text>
+                <Text style={[styles.emptyMissionSubtitle, { marginTop: 8, fontSize: 11, color: "#94A3B8" }]}>
+                  When an emergency is dispatched, real-time shortest path routing to the patient and hospital will display here automatically!
                 </Text>
               </View>
             )}
@@ -923,6 +970,57 @@ export default function App() {
                 onPress={handleConfirmVerifiedSOS}
               >
                 <Text style={{ fontWeight: "bold", color: "#FFFFFF", fontSize: 13 }}>Confirm & Call</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* SERVER URL CONFIG MODAL */}
+      <Modal visible={showServerModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { maxWidth: 360, width: "100%" }]}>
+            <Text style={styles.modalTitle}>⚙️ Backend Server URL</Text>
+            <Text style={[styles.modalSubtitle, { marginBottom: 12, textAlign: "center" }]}>
+              Enter your live Render or local Wi-Fi backend URL:
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderWidth: 1,
+                borderColor: "#CBD5E1",
+                borderRadius: 8,
+                padding: 10,
+                fontSize: 13,
+                color: "#0F172A",
+                marginBottom: 14,
+                width: "100%",
+              }}
+              value={serverUrlInput}
+              onChangeText={setServerUrlInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="e.g. https://resqroute.onrender.com"
+            />
+            <View style={{ flexDirection: "row", gap: 8, width: "100%" }}>
+              <TouchableOpacity
+                style={[styles.modalCloseButton, { flex: 1, backgroundColor: "#E2E8F0", marginTop: 0 }]}
+                onPress={() => setShowServerModal(false)}
+              >
+                <Text style={{ color: "#334155", fontWeight: "600", fontSize: 12 }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalCloseButton, { flex: 1, backgroundColor: "#2563EB", marginTop: 0 }]}
+                onPress={() => {
+                  setApiBaseUrl(serverUrlInput);
+                  setShowServerModal(false);
+                  showAlert("Server Updated", `Backend endpoint set to:\n${serverUrlInput}`);
+                  fetchLocations().then((locs) => {
+                    if (locs && locs.length) setLocations(locs);
+                  });
+                }}
+              >
+                <Text style={{ color: "#FFFFFF", fontWeight: "bold", fontSize: 12 }}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -1,7 +1,9 @@
 /**
  * ResQRoute Authenticated API Client for React Web Control Room
  */
-export const API_BASE_URL = "http://localhost:8000";
+export const API_BASE_URL =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) ||
+  "https://resqroute-cq1x.onrender.com";
 
 export function getAuthToken() {
   return localStorage.getItem("resqroute_token");
@@ -69,6 +71,53 @@ export async function fetchRoads() {
   const res = await fetch(`${API_BASE_URL}/api/roads`, {
     headers: authHeaders(),
   });
+  return await res.json();
+}
+
+export async function fetchLocations() {
+  const res = await fetch(`${API_BASE_URL}/api/locations`, {
+    headers: authHeaders(),
+  });
+  return await res.json();
+}
+
+export async function addLocation(payload) {
+  const res = await fetch(`${API_BASE_URL}/api/locations`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to add location");
+  }
+  return await res.json();
+}
+
+export async function addRoad(payload) {
+  const res = await fetch(`${API_BASE_URL}/api/roads`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to add road");
+  }
+  return await res.json();
+}
+
+export async function planRoute(start, destination) {
+  const res = await fetch(
+    `${API_BASE_URL}/api/route/plan?start=${encodeURIComponent(start)}&destination=${encodeURIComponent(destination)}`,
+    {
+      headers: authHeaders(),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || "Failed to calculate route");
+  }
   return await res.json();
 }
 
