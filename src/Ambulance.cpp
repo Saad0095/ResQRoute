@@ -16,6 +16,16 @@ int Ambulance::getId() const
     return id;
 }
 
+string Ambulance::getLocation() const
+{
+    return location;
+}
+
+void Ambulance::setLocation(const string &loc)
+{
+    location = loc;
+}
+
 bool Ambulance::getAvailibility() const
 {
     return isAvailable;

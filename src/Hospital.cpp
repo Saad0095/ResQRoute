@@ -11,6 +11,19 @@ Hospital::Hospital(int i, string n, string loc, int c)
     capacity = c;
 }
 
+int Hospital::getId() const { return id; }
+string Hospital::getName() const { return name; }
+string Hospital::getLocation() const { return location; }
+int Hospital::getCapacity() const { return capacity; }
+
+bool Hospital::admitPatient()
+{
+    if (capacity <= 0)
+        return false;
+    capacity--;
+    return true;
+}
+
 void Hospital::display() const
 {
     cout << "\n";

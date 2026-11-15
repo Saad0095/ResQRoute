@@ -4,6 +4,7 @@
 #include "Ambulance.h"
 #include "Hospital.h"
 #include "Emergency.h"
+#include "Graph.h"
 #include <queue>
 #include <vector>
 
@@ -15,6 +16,9 @@ private:
     vector<Ambulance> ambulances;
     vector<Hospital> hospitals;
     priority_queue<Emergency, vector<Emergency>, EmergencyPriority> emergencies;
+    Graph cityMap;
+
+    bool readLocation(const string &prompt, string &out) const;
 
 public:
     ResQRoute();
@@ -26,6 +30,12 @@ public:
     void registerEmergency();
     void displayEmergencies();
     void processNextEmergency();
+
+    // Graph features
+    void displayCityMap() const;
+    void addLocation();
+    void addRoad();
+    void findShortestRoute() const;
 
     int choice;
     void run();

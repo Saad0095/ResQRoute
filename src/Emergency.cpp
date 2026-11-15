@@ -17,6 +17,9 @@ int Emergency::getId() const
     return id;
 }
 
+string Emergency::getLocation() const { return location; }
+string Emergency::getPatientName() const { return patientName; }
+
 int Emergency::getSeverity() const
 {
     return severity;
@@ -42,6 +45,7 @@ void Emergency::display()
         break;
 
     default:
+        condition = "Unknown";
         break;
     }
 
