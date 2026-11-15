@@ -246,9 +246,16 @@ def trigger_sos(request: SOSRequest):
     5. Mark ambulance 'Busy' and decrement hospital bed count.
     6. Return complete dispatch decision with route steps & ETA.
     """
-    patient_loc = request.location
+    raw_loc = (request.location or "").strip()
+    patient_loc = state.canonicalize_node_name(raw_loc) if raw_loc else "Gulshan"
     if patient_loc not in state.graph.get_nodes():
-        patient_loc = "Gulshan"
+        norm_target = patient_loc.lower().replace(" ", "").replace("-", "")
+        for node in state.graph.get_nodes():
+            if node.lower().replace(" ", "").replace("-", "") == norm_target:
+                patient_loc = node
+                break
+        else:
+            patient_loc = "Gulshan" if "Gulshan" in state.graph.get_nodes() else (state.graph.get_nodes()[0] if state.graph.get_nodes() else "Gulshan")
 
     emergency_id = f"EMG-{uuid.uuid4().hex[:6].upper()}"
     triage_item = TriageEmergency(

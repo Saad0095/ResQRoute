@@ -2,6 +2,24 @@ import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated, Platform } from "react-native";
 
 // Fixed reference coordinates scaled for mobile screens (340 x 245 canvas)
+export const canonicalizeZone = (zone) => {
+  if (!zone) return "";
+  const norm = zone.toLowerCase().replace(/[\s-]/g, "");
+  if (
+    norm === "gulistanejauhar" ||
+    norm === "gulistanejohar" ||
+    norm === "gulistanjauhar" ||
+    norm === "gulistanjohar" ||
+    norm === "jauhar" ||
+    norm === "johar"
+  ) {
+    return "Gulistan-e-Jauhar";
+  }
+  if (norm === "northkarachi") return "North Karachi";
+  if (norm === "shahrahefaisal") return "Shahrah-e-Faisal";
+  return zone.trim();
+};
+
 const defaultNodeCoords = {
   "North Karachi":    { x: 75,  y: 35 },
   "Nazimabad":        { x: 55,  y: 95 },
@@ -13,7 +31,6 @@ const defaultNodeCoords = {
   "Clifton":          { x: 80,  y: 215 },
   "Defense":          { x: 190, y: 210 },
   "Gulistan-e-Jauhar":{ x: 175, y: 35 },
-  "Gulistan-e-Johar": { x: 175, y: 35 },
 };
 
 // Full city road network matching backend graph
@@ -24,6 +41,8 @@ const fullCityRoads = [
   { u: "Nazimabad", v: "Saddar", weight: 7.0 },
   { u: "Gulshan", v: "Saddar", weight: 8.0 },
   { u: "Gulshan", v: "Airport", weight: 10.0 },
+  { u: "Gulistan-e-Jauhar", v: "Gulshan", weight: 6.0 },
+  { u: "Gulistan-e-Jauhar", v: "Airport", weight: 8.0 },
   { u: "Saddar", v: "Clifton", weight: 4.0 },
   { u: "Clifton", v: "Defense", weight: 5.0 },
   { u: "Saddar", v: "Defense", weight: 6.5 },
@@ -53,15 +72,16 @@ export default function LiveVisualMap({
     ...(hospitalRoute && hospitalRoute.length > 1 ? hospitalRoute.slice(1) : []),
   ];
 
-  const getCoord = (zone) => {
-    if (!zone) return { x: 165, y: 120 };
+  const getCoord = (rawZone) => {
+    if (!rawZone) return { x: 165, y: 120 };
+    const zone = canonicalizeZone(rawZone);
     // Check if custom coordinates provided by backend / admin registry
-    if (customCoords && customCoords[zone]) {
-      const c = customCoords[zone];
-      if (typeof c.x === "number" && typeof c.y === "number") {
+    const targetCoord = (customCoords && (customCoords[zone] || customCoords[rawZone])) || null;
+    if (targetCoord) {
+      if (typeof targetCoord.x === "number" && typeof targetCoord.y === "number") {
         // Dynamic scaling: map web coordinate space [50..800, 50..420] into mobile canvas [30..310, 30..220]
-        const scaledX = Math.round(30 + ((c.x - 50) / 750) * 280);
-        const scaledY = Math.round(30 + ((c.y - 50) / 370) * 190);
+        const scaledX = Math.round(30 + ((targetCoord.x - 50) / 750) * 280);
+        const scaledY = Math.round(30 + ((targetCoord.y - 50) / 370) * 190);
         return {
           x: Math.max(25, Math.min(315, scaledX)),
           y: Math.max(25, Math.min(225, scaledY)),
@@ -69,6 +89,7 @@ export default function LiveVisualMap({
       }
     }
     if (defaultNodeCoords[zone]) return defaultNodeCoords[zone];
+    if (defaultNodeCoords[rawZone]) return defaultNodeCoords[rawZone];
     let hash = 0;
     for (let i = 0; i < zone.length; i++) {
       hash = (hash << 5) - hash + zone.charCodeAt(i);
@@ -171,13 +192,23 @@ export default function LiveVisualMap({
     );
   };
 
-  const distinctNodes = Array.from(
-    new Set([
-      ...Object.keys(defaultNodeCoords),
-      ...Object.keys(customCoords || {}),
-      ...(fullRoute || []),
-    ])
-  );
+  const seenNorm = new Set();
+  const distinctNodes = [];
+  const rawCandidateNodes = [
+    ...Object.keys(defaultNodeCoords),
+    ...Object.keys(customCoords || {}),
+    ...(fullRoute || []),
+    ...(patientLocation ? [patientLocation] : []),
+    ...(hospitalLocation ? [hospitalLocation] : []),
+  ];
+  for (const raw of rawCandidateNodes) {
+    const canon = canonicalizeZone(raw);
+    const norm = canon.toLowerCase().replace(/[\s-]/g, "");
+    if (norm && !seenNorm.has(norm)) {
+      seenNorm.add(norm);
+      distinctNodes.push(canon);
+    }
+  }
 
   return (
     <View style={styles.container}>

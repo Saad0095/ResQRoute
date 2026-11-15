@@ -27,7 +27,7 @@ import {
   setApiBaseUrl,
 } from "./src/api";
 import { theme } from "./src/theme";
-import LiveVisualMap from "./src/LiveVisualMap";
+import LiveVisualMap, { canonicalizeZone } from "./src/LiveVisualMap";
 
 export default function App() {
   // App Role: 'citizen' or 'driver'
@@ -39,17 +39,19 @@ export default function App() {
   const [liveGpsCoords, setLiveGpsCoords] = useState(null);
   const [trackingStepIndex, setTrackingStepIndex] = useState(0);
   const [locations, setLocations] = useState([
+    "Airport",
+    "Clifton",
+    "Defense",
+    "Gulistan-e-Jauhar",
     "Gulshan",
+    "Malir",
     "Nazimabad",
     "North Karachi",
     "Saddar",
-    "Clifton",
-    "Defense",
-    "Airport",
-    "Malir",
     "Shahrah-e-Faisal",
   ]);
   const [locationCoords, setLocationCoords] = useState({});
+  const [locationSearch, setLocationSearch] = useState("");
   const [severity, setSeverity] = useState(4); // 4 = Critical, 3 = High, 2 = Medium, 1 = Low
   const [loading, setLoading] = useState(false);
   const [dispatchResult, setDispatchResult] = useState(null);
@@ -138,18 +140,46 @@ export default function App() {
       ])
     ).start();
 
-    fetchLocations().then((res) => {
-      if (res) {
-        const locs = Array.isArray(res) ? res : res.locations;
-        const coords = Array.isArray(res) ? {} : (res.coords || {});
-        if (locs && locs.length > 0) setLocations(locs);
-        if (coords && Object.keys(coords).length > 0) setLocationCoords(coords);
-      }
-    });
+    refreshLocations();
 
     // Auto-detect live GPS coordinates on startup
     detectLiveLocation();
   }, []);
+
+  const refreshLocations = async () => {
+    try {
+      const res = await fetchLocations();
+      if (res) {
+        const rawLocs = Array.isArray(res) ? res : (res.locations || []);
+        const coords = Array.isArray(res) ? {} : (res.coords || {});
+        if (rawLocs && rawLocs.length > 0) {
+          const seen = new Set();
+          const cleanLocs = [];
+          for (const raw of rawLocs) {
+            const canon = canonicalizeZone(raw);
+            const norm = canon.toLowerCase().replace(/[\s-]/g, "");
+            if (norm && !seen.has(norm)) {
+              seen.add(norm);
+              cleanLocs.push(canon);
+            }
+          }
+          cleanLocs.sort();
+          setLocations(cleanLocs);
+        }
+        if (coords && Object.keys(coords).length > 0) {
+          setLocationCoords(coords);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch locations", e);
+    }
+  };
+
+  const handleOpenLocationModal = () => {
+    refreshLocations();
+    setLocationSearch("");
+    setShowLocationModal(true);
+  };
 
   // Live Location Detector using standard browser/device geolocation
   const detectLiveLocation = () => {
@@ -167,6 +197,7 @@ export default function App() {
             { name: "Clifton", lat: 24.8138, lng: 67.0299 },
             { name: "Defense", lat: 24.8016, lng: 67.0652 },
             { name: "Gulshan", lat: 24.9207, lng: 67.0928 },
+            { name: "Gulistan-e-Jauhar", lat: 24.9312, lng: 67.1350 },
             { name: "Nazimabad", lat: 24.9180, lng: 67.0332 },
             { name: "North Karachi", lat: 24.9961, lng: 67.0620 },
             { name: "Airport", lat: 24.9056, lng: 67.1608 },
@@ -321,6 +352,8 @@ export default function App() {
   };
 
   const handleSOSPress = () => {
+    // Refresh latest locations dynamically before opening prompt
+    refreshLocations();
     // Open verification prompt to validate emergency case and prevent prank calls
     setShowVerifyModal(true);
   };
@@ -551,7 +584,7 @@ export default function App() {
             <View style={styles.locationBar}>
               <TouchableOpacity
                 style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
-                onPress={() => setShowLocationModal(true)}
+                onPress={handleOpenLocationModal}
                 activeOpacity={0.8}
               >
                 <View style={styles.locationIconBg}>
@@ -1448,40 +1481,84 @@ export default function App() {
       {/* LOCATION SELECTION MODAL */}
       <Modal visible={showLocationModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, { maxHeight: "85%", maxWidth: 440, width: "100%" }]}>
             <Text style={styles.modalTitle}>Select Emergency Zone</Text>
-            <Text style={styles.modalSubtitle}>Choose the simulated city location:</Text>
-            {locations.map((loc) => (
-              <TouchableOpacity
-                key={loc}
-                style={[
-                  styles.modalItem,
-                  selectedLocation === loc && styles.modalItemActive,
-                ]}
-                onPress={() => {
-                  setSelectedLocation(loc);
-                  setShowLocationModal(false);
-                }}
-              >
-                <Text
-                  style={[
-                    styles.modalItemText,
-                    selectedLocation === loc && styles.modalItemTextActive,
-                  ]}
-                >
-                  📍 {loc}
+            <Text style={styles.modalSubtitle}>Choose the simulated city location or sector:</Text>
+
+            <TextInput
+              style={{
+                backgroundColor: "#F8FAFC",
+                borderWidth: 1,
+                borderColor: "#CBD5E1",
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 9,
+                fontSize: 13,
+                color: "#0F172A",
+                marginVertical: 10,
+              }}
+              placeholder="🔍 Search sector (e.g. Jauhar, Nazimabad)..."
+              placeholderTextColor="#94A3B8"
+              value={locationSearch}
+              onChangeText={setLocationSearch}
+              autoCapitalize="words"
+            />
+
+            <ScrollView style={{ maxHeight: 320, width: "100%" }} showsVerticalScrollIndicator={true}>
+              {locations
+                .filter((loc) =>
+                  !locationSearch.trim() ||
+                  loc.toLowerCase().includes(locationSearch.trim().toLowerCase())
+                )
+                .map((loc) => (
+                  <TouchableOpacity
+                    key={loc}
+                    style={[
+                      styles.modalItem,
+                      selectedLocation === loc && styles.modalItemActive,
+                    ]}
+                    onPress={() => {
+                      setSelectedLocation(loc);
+                      setShowLocationModal(false);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.modalItemText,
+                        selectedLocation === loc && styles.modalItemTextActive,
+                      ]}
+                    >
+                      📍 {loc}
+                    </Text>
+                    {selectedLocation === loc ? (
+                      <Text style={{ color: theme.colors.primaryRed, fontWeight: "bold" }}>✓ Selected</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                ))}
+              {locations.filter((loc) =>
+                !locationSearch.trim() ||
+                loc.toLowerCase().includes(locationSearch.trim().toLowerCase())
+              ).length === 0 && (
+                <Text style={{ textAlign: "center", color: "#94A3B8", marginVertical: 20, fontSize: 12 }}>
+                  No matching city sector found
                 </Text>
-                {selectedLocation === loc ? (
-                  <Text style={{ color: theme.colors.primaryRed, fontWeight: "bold" }}>✓</Text>
-                ) : null}
+              )}
+            </ScrollView>
+
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
+              <TouchableOpacity
+                style={[styles.modalCloseButton, { flex: 1, backgroundColor: "#F1F5F9", borderWidth: 1, borderColor: "#E2E8F0" }]}
+                onPress={refreshLocations}
+              >
+                <Text style={[styles.modalCloseText, { color: "#475569" }]}>🔄 Sync Sectors</Text>
               </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setShowLocationModal(false)}
-            >
-              <Text style={styles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalCloseButton, { flex: 1, backgroundColor: theme.colors.primaryRed }]}
+                onPress={() => setShowLocationModal(false)}
+              >
+                <Text style={[styles.modalCloseText, { color: "#FFFFFF" }]}>Done</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1494,6 +1571,27 @@ export default function App() {
             <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
               To prevent false alarms and ensure swift dispatch, please confirm emergency details:
             </Text>
+
+            {/* EMERGENCY LOCATION DISPLAY CARD */}
+            <View style={{ backgroundColor: "#F8FAFC", padding: 11, borderRadius: 10, marginBottom: 14, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderWidth: 1, borderColor: "#E2E8F0" }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 10, color: "#64748B", fontWeight: "700", letterSpacing: 0.5 }}>
+                  EMERGENCY LOCATION
+                </Text>
+                <Text style={{ fontSize: 14, fontWeight: "bold", color: "#0F172A", marginTop: 2 }}>
+                  📍 {selectedLocation}, Karachi
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowVerifyModal(false);
+                  handleOpenLocationModal();
+                }}
+                style={{ paddingVertical: 5, paddingHorizontal: 10, backgroundColor: "#EFF6FF", borderRadius: 6, borderWidth: 1, borderColor: "#BFDBFE" }}
+              >
+                <Text style={{ fontSize: 11, color: "#2563EB", fontWeight: "700" }}>Change ▾</Text>
+              </TouchableOpacity>
+            </View>
 
             <Text style={{ fontSize: 12, fontWeight: "600", color: "#334155", marginBottom: 4 }}>
               Incident Type:
