@@ -1,4 +1,3 @@
-// Hospital.cpp
 #include "Hospital.h"
 #include <iostream>
 
@@ -32,7 +31,6 @@ int Hospital::getCapacity() const
     return capacity;
 }
 
-// Takes one bed. If the hospital is already full we do nothing and say "false".
 bool Hospital::admitPatient()
 {
     if (capacity <= 0)

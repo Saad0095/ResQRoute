@@ -1,10 +1,8 @@
-// Ambulance.cpp
 #include "Ambulance.h"
 #include <iostream>
 
 using namespace std;
 
-// Constructor: copies the given values into the object's own variables.
 Ambulance::Ambulance(int i, string d, string loc, bool av)
 {
     id = i;
@@ -38,7 +36,6 @@ void Ambulance::setLocation(const string &loc)
     location = loc;
 }
 
-// "!" means NOT, so true becomes false and false becomes true.
 void Ambulance::toggleAvailability()
 {
     isAvailable = !isAvailable;
@@ -50,6 +47,6 @@ void Ambulance::display() const
     cout << "ID: " << id << "\n";
     cout << "Driver: " << driverName << "\n";
     cout << "Location: " << location << "\n";
-    // Ternary operator:  condition ? valueIfTrue : valueIfFalse
+
     cout << "Status: " << (isAvailable ? "Available" : "Busy") << "\n";
 }

@@ -1,13 +1,3 @@
-// ResQRoute.cpp
-// Contents:
-//   1. Input helpers
-//   2. Constructor and file handling (load / save / starter data)
-//   3. Ambulances
-//   4. Hospitals
-//   5. Emergencies (including the automatic dispatch)
-//   6. City map (graph) features
-//   7. The main menu
-
 #include "ResQRoute.h"
 #include <algorithm>
 #include <cstdlib>
@@ -18,25 +8,18 @@
 
 using namespace std;
 
-// The file where everything is stored. It is created in the folder you run the program from.
 static const string DATA_FILE = "resqroute_data.txt";
 
-// =====================================================================
-// 1. INPUT HELPERS
-// =====================================================================
-
-// Reads an int from the keyboard. Returns false if the user typed something that is not a number.
 static bool readInt(int &value)
 {
     if (cin >> value)
         return true;
 
-    cin.clear();                                         // fix cin after the bad input
-    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // throw away the bad text
+    cin.clear();
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
     return false;
 }
 
-// Same as readInt, but for numbers with a decimal point (like 7.5 km).
 static bool readDouble(double &value)
 {
     if (cin >> value)
@@ -47,14 +30,11 @@ static bool readDouble(double &value)
     return false;
 }
 
-// After "cin >> number" the Enter key is still waiting in the input.
-// This removes it so the next getline() does not read an empty line.
 static void flushLine()
 {
     cin.ignore(numeric_limits<streamsize>::max(), '\n');
 }
 
-// Cuts a line like "101|Ali|Gulshan|1" into pieces: {"101", "Ali", "Gulshan", "1"}.
 static vector<string> splitByBar(const string &line)
 {
     vector<string> parts;
@@ -72,12 +52,10 @@ static vector<string> splitByBar(const string &line)
             current += line[i];
         }
     }
-    parts.push_back(current); // the last piece
+    parts.push_back(current);
     return parts;
 }
 
-// The file uses '|' as a separator, so a '|' typed by the user would break the file.
-// We replace it with '-' before saving.
 static string removeBars(string text)
 {
     for (size_t i = 0; i < text.size(); i++)
@@ -88,8 +66,6 @@ static string removeBars(string text)
     return text;
 }
 
-// Asks the user for a location name and checks that it exists on the city map.
-// Returns true and fills "out" if it is valid.
 bool ResQRoute::readLocation(const string &prompt, string &out) const
 {
     cout << prompt;
@@ -102,24 +78,16 @@ bool ResQRoute::readLocation(const string &prompt, string &out) const
         return false;
     }
 
-    out = cityMap.nameOf(index); // use the official spelling, e.g. "clifton" -> "Clifton"
+    out = cityMap.nameOf(index);
     return true;
 }
 
-// =====================================================================
-// 2. CONSTRUCTOR AND FILE HANDLING
-// =====================================================================
-
-// Runs automatically when "ResQRoute app;" is created in main().
-// No data is typed in here any more: everything comes from the file.
 ResQRoute::ResQRoute()
 {
     choice = -1;
     loadOrCreateData();
 }
 
-// If the data file exists   -> load it (starter data is NOT added again).
-// If it does not exist      -> this is the first run: add starter data and create the file.
 void ResQRoute::loadOrCreateData()
 {
     ifstream file(DATA_FILE.c_str());
@@ -137,16 +105,14 @@ void ResQRoute::loadOrCreateData()
     file.close();
 }
 
-// The sample data. This runs ONLY when the data file is being created for the first time.
 void ResQRoute::addStarterData()
 {
-    // City locations
+
     const char *locations[] = {"North Karachi", "Nazimabad", "Gulshan", "Saddar", "Clifton",
                                "DHA", "Korangi", "Malir", "Airport"};
     for (int i = 0; i < 9; i++)
         cityMap.addLocation(locations[i]);
 
-    // Roads: addRoad(location1, location2, distance in km)
     cityMap.addRoad("North Karachi", "Nazimabad", 6);
     cityMap.addRoad("North Karachi", "Gulshan", 11);
     cityMap.addRoad("Nazimabad", "Gulshan", 7);
@@ -162,29 +128,18 @@ void ResQRoute::addStarterData()
     cityMap.addRoad("Korangi", "Malir", 10);
     cityMap.addRoad("Saddar", "Korangi", 13);
 
-    // Ambulances: (id, driver, location, isAvailable)
     ambulances.push_back(Ambulance(101, "Ali", "North Karachi", true));
     ambulances.push_back(Ambulance(102, "Ahmed", "Gulshan", false));
     ambulances.push_back(Ambulance(103, "Usman", "Nazimabad", true));
 
-    // Hospitals: (id, name, location, free beds)
     hospitals.push_back(Hospital(201, "City Hospital", "Gulshan", 12));
     hospitals.push_back(Hospital(202, "Central Hospital", "Nazimabad", 5));
     hospitals.push_back(Hospital(203, "Coastal Hospital", "Clifton", 8));
 }
 
-// Writes everything to the data file. The file is plain text, split into sections:
-//
-//   [LOCATIONS]      one location name per line
-//   [ROADS]          from|to|km
-//   [AMBULANCES]     id|driver|location|available(1 or 0)
-//   [HOSPITALS]      id|name|location|freeBeds
-//   [EMERGENCIES]    id|patient|location|severity
-//
-// Locations are written first because roads need them to exist when loading.
 void ResQRoute::saveData() const
 {
-    ofstream file(DATA_FILE.c_str()); // opening for writing replaces the old content
+    ofstream file(DATA_FILE.c_str());
 
     if (!file.is_open())
     {
@@ -192,18 +147,15 @@ void ResQRoute::saveData() const
         return;
     }
 
-    // --- Locations ---
     file << "[LOCATIONS]\n";
     for (int i = 0; i < cityMap.size(); i++)
         file << removeBars(cityMap.nameOf(i)) << "\n";
 
-    // --- Roads ---
     file << "[ROADS]\n";
     vector<Road> roads = cityMap.getAllRoads();
     for (size_t i = 0; i < roads.size(); i++)
         file << removeBars(roads[i].from) << "|" << removeBars(roads[i].to) << "|" << roads[i].km << "\n";
 
-    // --- Ambulances ---
     file << "[AMBULANCES]\n";
     for (size_t i = 0; i < ambulances.size(); i++)
     {
@@ -212,7 +164,6 @@ void ResQRoute::saveData() const
              << removeBars(a.getLocation()) << "|" << (a.getAvailability() ? 1 : 0) << "\n";
     }
 
-    // --- Hospitals ---
     file << "[HOSPITALS]\n";
     for (size_t i = 0; i < hospitals.size(); i++)
     {
@@ -221,9 +172,6 @@ void ResQRoute::saveData() const
              << removeBars(h.getLocation()) << "|" << h.getCapacity() << "\n";
     }
 
-    // --- Pending emergencies ---
-    // A priority_queue can only show its top element, so we work on a COPY
-    // and pop that copy until it is empty. The real queue stays untouched.
     file << "[EMERGENCIES]\n";
     priority_queue<Emergency, vector<Emergency>, EmergencyPriority> queueCopy = emergencies;
     while (!queueCopy.empty())
@@ -235,27 +183,22 @@ void ResQRoute::saveData() const
     }
 }
 
-// Reads the data file line by line.
-//   - A line starting with '[' tells us which section we are in now.
-//   - Any other line is one record of that section.
 void ResQRoute::loadData(ifstream &file)
 {
     string line;
-    string section;      // the section we are currently reading, e.g. "[ROADS]"
+    string section;
     int lineNumber = 0;
 
     while (getline(file, line))
     {
         lineNumber++;
 
-        // Files made on Windows can end lines with '\r'; remove it.
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
 
         if (line.empty())
             continue;
 
-        // A section heading: remember it and go to the next line.
         if (line[0] == '[')
         {
             section = line;
@@ -270,13 +213,13 @@ void ResQRoute::loadData(ifstream &file)
         }
         else if (section == "[ROADS]")
         {
-            vector<string> p = splitByBar(line); // p[0]=from, p[1]=to, p[2]=km
+            vector<string> p = splitByBar(line);
             if (p.size() == 3)
                 lineWasValid = cityMap.addRoad(p[0], p[1], atof(p[2].c_str()));
         }
         else if (section == "[AMBULANCES]")
         {
-            vector<string> p = splitByBar(line); // id, driver, location, available
+            vector<string> p = splitByBar(line);
             if (p.size() == 4)
             {
                 ambulances.push_back(Ambulance(atoi(p[0].c_str()), p[1], p[2], p[3] == "1"));
@@ -285,7 +228,7 @@ void ResQRoute::loadData(ifstream &file)
         }
         else if (section == "[HOSPITALS]")
         {
-            vector<string> p = splitByBar(line); // id, name, location, free beds
+            vector<string> p = splitByBar(line);
             if (p.size() == 4)
             {
                 hospitals.push_back(Hospital(atoi(p[0].c_str()), p[1], p[2], atoi(p[3].c_str())));
@@ -294,7 +237,7 @@ void ResQRoute::loadData(ifstream &file)
         }
         else if (section == "[EMERGENCIES]")
         {
-            vector<string> p = splitByBar(line); // id, patient, location, severity
+            vector<string> p = splitByBar(line);
             if (p.size() == 4)
             {
                 emergencies.push(Emergency(atoi(p[0].c_str()), p[1], p[2], atoi(p[3].c_str())));
@@ -307,10 +250,6 @@ void ResQRoute::loadData(ifstream &file)
     }
 }
 
-// =====================================================================
-// 3. AMBULANCES
-// =====================================================================
-
 void ResQRoute::displayAmbulances() const
 {
     cout << "\n--- Ambulance List ---\n";
@@ -321,8 +260,6 @@ void ResQRoute::displayAmbulances() const
         return;
     }
 
-    // Range-based for loop: "ambulance" is each element in turn.
-    // "const &" means: do not copy it and do not change it.
     for (const Ambulance &ambulance : ambulances)
     {
         ambulance.display();
@@ -331,7 +268,7 @@ void ResQRoute::displayAmbulances() const
 
 void ResQRoute::addAmbulance()
 {
-    // Step 1: read and check the ID.
+
     int id;
     cout << "Enter ambulance ID: ";
     if (!readInt(id) || id <= 0)
@@ -340,9 +277,6 @@ void ResQRoute::addAmbulance()
         return;
     }
 
-    // Step 2: make sure no other ambulance already uses this ID.
-    // find_if walks through the list and stops at the first one for which the lambda returns true.
-    // The lambda is a tiny nameless function; [id] lets it use the "id" typed above.
     auto it = find_if(
         ambulances.begin(),
         ambulances.end(),
@@ -351,13 +285,12 @@ void ResQRoute::addAmbulance()
             return a.getId() == id;
         });
 
-    if (it != ambulances.end()) // "end()" means "not found"; so here it WAS found
+    if (it != ambulances.end())
     {
         cout << "Ambulance ID already exists.\n";
         return;
     }
 
-    // Step 3: read the remaining details.
     flushLine();
 
     string driver;
@@ -368,7 +301,6 @@ void ResQRoute::addAmbulance()
     if (!readLocation("Enter current location: ", location))
         return;
 
-    // Step 4: create the ambulance (it starts as available) and save.
     ambulances.push_back(Ambulance(id, driver, location, true));
     saveData();
 
@@ -385,7 +317,6 @@ void ResQRoute::updateAmbulanceStatus()
         return;
     }
 
-    // Find the ambulance with this ID (same idea as in addAmbulance).
     auto it = find_if(
         ambulances.begin(),
         ambulances.end(),
@@ -394,22 +325,18 @@ void ResQRoute::updateAmbulanceStatus()
             return a.getId() == id;
         });
 
-    if (it == ambulances.end()) // reached the end without finding it
+    if (it == ambulances.end())
     {
         cout << "Ambulance not found.\n";
         return;
     }
 
-    it->toggleAvailability(); // "->" calls a function on the object the iterator points to
+    it->toggleAvailability();
     saveData();
 
     cout << "Ambulance status updated.\n";
     it->display();
 }
-
-// =====================================================================
-// 4. HOSPITALS
-// =====================================================================
 
 void ResQRoute::displayHospitals() const
 {
@@ -429,7 +356,7 @@ void ResQRoute::displayHospitals() const
 
 void ResQRoute::addHospital()
 {
-    // Step 1: read and check the ID.
+
     int id;
     cout << "Enter hospital ID: ";
     if (!readInt(id) || id <= 0)
@@ -438,7 +365,6 @@ void ResQRoute::addHospital()
         return;
     }
 
-    // Step 2: the ID must be new.
     auto it = find_if(
         hospitals.begin(),
         hospitals.end(),
@@ -453,7 +379,6 @@ void ResQRoute::addHospital()
         return;
     }
 
-    // Step 3: read the remaining details.
     flushLine();
 
     string name;
@@ -472,20 +397,15 @@ void ResQRoute::addHospital()
         return;
     }
 
-    // Step 4: create the hospital and save.
     hospitals.push_back(Hospital(id, name, location, capacity));
     saveData();
 
     cout << "Hospital added successfully.\n";
 }
 
-// =====================================================================
-// 5. EMERGENCIES
-// =====================================================================
-
 void ResQRoute::registerEmergency()
 {
-    // Step 1: read and check the ID.
+
     int id;
     cout << "Enter emergency ID: ";
     if (!readInt(id) || id <= 0)
@@ -494,8 +414,6 @@ void ResQRoute::registerEmergency()
         return;
     }
 
-    // Step 2: check the ID is new. A priority_queue cannot be searched directly,
-    // so we pop elements from a COPY of it and compare IDs.
     auto temp = emergencies;
     while (!temp.empty())
     {
@@ -507,7 +425,6 @@ void ResQRoute::registerEmergency()
         temp.pop();
     }
 
-    // Step 3: read the remaining details.
     flushLine();
 
     string patientName;
@@ -526,14 +443,12 @@ void ResQRoute::registerEmergency()
         return;
     }
 
-    // Step 4: push into the priority queue (it puts it in the right order by itself) and save.
     emergencies.push(Emergency(id, patientName, location, severity));
     saveData();
 
     cout << "Emergency registered successfully.\n";
 }
 
-// Shows emergencies from most urgent to least urgent WITHOUT removing them.
 void ResQRoute::displayEmergencies()
 {
     cout << "\n--- Emergencies Sorted By Priority ---\n";
@@ -544,34 +459,28 @@ void ResQRoute::displayEmergencies()
         return;
     }
 
-    // Work on a copy so the real queue is not emptied.
     auto sortedEmergencies = emergencies;
     while (!sortedEmergencies.empty())
     {
-        Emergency emergency = sortedEmergencies.top(); // most urgent left in the copy
+        Emergency emergency = sortedEmergencies.top();
         emergency.display();
-        sortedEmergencies.pop();                       // remove it from the copy
+        sortedEmergencies.pop();
     }
 }
 
-// Among all FREE ambulances, finds the one closest to the emergency.
-//   dist       = distances from the emergency to every location (from Dijkstra)
-//   distanceKm = filled with the distance of the chosen ambulance
-// Returns its position in the "ambulances" list, or -1 if none can be used.
 int ResQRoute::findNearestAmbulance(const vector<double> &dist, double &distanceKm) const
 {
     int bestIndex = -1;
-    distanceKm = numeric_limits<double>::infinity(); // "nothing found yet"
+    distanceKm = numeric_limits<double>::infinity();
 
     for (size_t i = 0; i < ambulances.size(); i++)
     {
-        // Busy ambulances cannot be sent.
+
         if (!ambulances[i].getAvailability())
             continue;
 
         int locationIndex = cityMap.indexOf(ambulances[i].getLocation());
 
-        // Closer than the best one so far?
         if (locationIndex != -1 && dist[locationIndex] < distanceKm)
         {
             distanceKm = dist[locationIndex];
@@ -581,7 +490,6 @@ int ResQRoute::findNearestAmbulance(const vector<double> &dist, double &distance
     return bestIndex;
 }
 
-// Among all hospitals that still have a free bed, finds the one closest to the emergency.
 int ResQRoute::findNearestHospital(const vector<double> &dist, double &distanceKm) const
 {
     int bestIndex = -1;
@@ -589,7 +497,7 @@ int ResQRoute::findNearestHospital(const vector<double> &dist, double &distanceK
 
     for (size_t i = 0; i < hospitals.size(); i++)
     {
-        // A full hospital cannot take the patient.
+
         if (hospitals[i].getCapacity() <= 0)
             continue;
 
@@ -604,19 +512,15 @@ int ResQRoute::findNearestHospital(const vector<double> &dist, double &distanceK
     return bestIndex;
 }
 
-// AUTOMATIC DISPATCH
-//   most urgent emergency -> nearest free ambulance -> nearest hospital with a free bed
-// If anything is missing, the emergency stays in the queue and is tried again later.
 void ResQRoute::processNextEmergency()
 {
-    // Step 1: is there anything to process?
+
     if (emergencies.empty())
     {
         cout << "No pending emergencies to process.\n";
         return;
     }
 
-    // Step 2: look at (but do NOT remove) the most urgent emergency.
     Emergency emergency = emergencies.top();
 
     int patientNode = cityMap.indexOf(emergency.getLocation());
@@ -626,13 +530,10 @@ void ResQRoute::processNextEmergency()
         return;
     }
 
-    // Step 3: one Dijkstra run from the patient gives the distance to every location.
-    // Roads are two-way, so "patient -> ambulance" equals "ambulance -> patient".
     vector<double> dist;
     vector<int> prev;
     cityMap.dijkstra(patientNode, dist, prev);
 
-    // Step 4: choose the nearest free ambulance.
     double ambulanceKm;
     int ambulanceIndex = findNearestAmbulance(dist, ambulanceKm);
     if (ambulanceIndex == -1)
@@ -641,7 +542,6 @@ void ResQRoute::processNextEmergency()
         return;
     }
 
-    // Step 5: choose the nearest hospital that has space.
     double hospitalKm;
     int hospitalIndex = findNearestHospital(dist, hospitalKm);
     if (hospitalIndex == -1)
@@ -650,18 +550,14 @@ void ResQRoute::processNextEmergency()
         return;
     }
 
-    // These are references (second names) for the real objects in the lists,
-    // so changes made through them change the real ambulance and hospital.
     Ambulance &ambulance = ambulances[ambulanceIndex];
     Hospital &hospital = hospitals[hospitalIndex];
 
-    // Step 6: get the two actual routes to show to the user.
     vector<int> routeToPatient;
     vector<int> routeToHospital;
     cityMap.shortestPath(cityMap.indexOf(ambulance.getLocation()), patientNode, routeToPatient);
     cityMap.shortestPath(patientNode, cityMap.indexOf(hospital.getLocation()), routeToHospital);
 
-    // Step 7: show the result.
     cout << "\n--- Processing Emergency ---";
     emergency.display();
 
@@ -671,7 +567,7 @@ void ResQRoute::processNextEmergency()
     cout << "\n--- Assigned Hospital ---";
     hospital.display();
 
-    const double AVERAGE_SPEED_KMH = 40.0; // assumed speed, only used for the time estimate
+    const double AVERAGE_SPEED_KMH = 40.0;
     double totalKm = ambulanceKm + hospitalKm;
 
     cout << "\n--- Route ---\n";
@@ -683,19 +579,14 @@ void ResQRoute::processNextEmergency()
     cout << "Estimated time       : " << (totalKm / AVERAGE_SPEED_KMH) * 60.0
          << " min (at " << AVERAGE_SPEED_KMH << " km/h)\n";
 
-    // Step 8: update the system.
-    ambulance.toggleAvailability();                // it is busy now
-    ambulance.setLocation(hospital.getLocation()); // and it ends at the hospital
-    hospital.admitPatient();                       // one bed used
-    emergencies.pop();                             // the emergency is handled, remove it
+    ambulance.toggleAvailability();
+    ambulance.setLocation(hospital.getLocation());
+    hospital.admitPatient();
+    emergencies.pop();
     saveData();
 
     cout << "Emergency processed successfully.\n";
 }
-
-// =====================================================================
-// 6. CITY MAP (GRAPH) FEATURES
-// =====================================================================
 
 void ResQRoute::displayCityMap() const
 {
@@ -710,7 +601,6 @@ void ResQRoute::addLocation()
     cout << "Enter new location name: ";
     getline(cin, name);
 
-    // A name starting with '[' would be confused with a section heading in the data file.
     if (!name.empty() && name[0] == '[')
     {
         cout << "Location name cannot start with '['.\n";
@@ -784,18 +674,13 @@ void ResQRoute::findShortestRoute() const
     cout << "Distance: " << km << " km\n";
 }
 
-// =====================================================================
-// 7. THE MAIN MENU
-// =====================================================================
-
 void ResQRoute::run()
 {
-    // Print every decimal number with exactly 1 digit after the point (e.g. 21.0).
+
     cout << fixed << setprecision(1);
 
     cout << "** Welcome to ResQRoute **\n";
 
-    // do-while: the menu is shown at least once, and again until the user picks 0.
     do
     {
         cout << "\n";
@@ -814,10 +699,9 @@ void ResQRoute::run()
         cout << "0.  Exit\n";
         cout << "Enter your choice: ";
 
-        // If the user typed letters instead of a number, show a message and show the menu again.
         if (!readInt(choice))
         {
-            if (cin.eof()) // the input has ended completely; stop to avoid an endless loop
+            if (cin.eof())
                 break;
 
             cout << "Invalid input. Please enter a number.\n";
@@ -825,7 +709,6 @@ void ResQRoute::run()
             continue;
         }
 
-        // Run the function that matches the chosen number.
         switch (choice)
         {
         case 1:
@@ -865,7 +748,7 @@ void ResQRoute::run()
             findShortestRoute();
             break;
         case 0:
-            saveData(); // one last save before leaving
+            saveData();
             cout << "Exiting ResQRoute... Thanks for Using!\n";
             break;
         default:

@@ -1,4 +1,3 @@
-// Graph.cpp
 #include "Graph.h"
 #include <algorithm>
 #include <iostream>
@@ -7,7 +6,6 @@
 
 using namespace std;
 
-// Makes every letter small so that "gulshan", "GULSHAN" and "Gulshan" are treated the same.
 string Graph::toLower(const string &s)
 {
     string result = s;
@@ -16,7 +14,6 @@ string Graph::toLower(const string &s)
     return result;
 }
 
-// Looks for a location by name. Returns its number, or -1 if it is not on the map.
 int Graph::indexOf(const string &name) const
 {
     string wanted = toLower(name);
@@ -29,29 +26,25 @@ int Graph::indexOf(const string &name) const
     return -1;
 }
 
-// Adds a new location (node) with no roads yet.
 int Graph::addLocation(const string &name)
 {
-    // Refuse empty names and names that already exist.
+
     if (name.empty() || indexOf(name) != -1)
         return -1;
 
     names.push_back(name);
-    adj.push_back(vector<Edge>()); // this new location starts with an empty list of roads
-    return (int)names.size() - 1;  // its number is the last position
+    adj.push_back(vector<Edge>());
+    return (int)names.size() - 1;
 }
 
-// Adds a two-way road between locations a and b.
 bool Graph::addRoad(const string &a, const string &b, double km)
 {
     int u = indexOf(a);
     int v = indexOf(b);
 
-    // Both locations must exist, must be different, and the length must be positive.
     if (u == -1 || v == -1 || u == v || km <= 0)
         return false;
 
-    // If this road already exists, only update its length (both directions).
     for (size_t i = 0; i < adj[u].size(); i++)
     {
         if (adj[u][i].to == v)
@@ -66,7 +59,6 @@ bool Graph::addRoad(const string &a, const string &b, double km)
         }
     }
 
-    // Otherwise create the road in BOTH directions (the graph is undirected).
     Edge roadFromU;
     roadFromU.to = v;
     roadFromU.km = km;
@@ -92,7 +84,6 @@ string Graph::nameOf(int index) const
     return "Unknown";
 }
 
-// Every road is stored twice (u->v and v->u), so we keep only the one where u < v.
 vector<Road> Graph::getAllRoads() const
 {
     vector<Road> roads;
@@ -138,46 +129,36 @@ void Graph::display() const
     }
 }
 
-// DIJKSTRA'S ALGORITHM
-// Idea: always take the location that is currently the closest to the start,
-// then check if going through it gives its neighbours a shorter distance.
 void Graph::dijkstra(int src, vector<double> &dist, vector<int> &prev) const
 {
-    const double INFINITE = numeric_limits<double>::infinity(); // "not reached yet"
+    const double INFINITE = numeric_limits<double>::infinity();
 
-    // Step 1: at the start every location is unreachable and has no previous location.
     dist.assign(size(), INFINITE);
     prev.assign(size(), -1);
 
     if (src < 0 || src >= size())
         return;
 
-    // Step 2: a min-priority-queue of (distance, location). The smallest distance comes out first.
     typedef pair<double, int> DistAndNode;
     priority_queue<DistAndNode, vector<DistAndNode>, greater<DistAndNode> > queueOfNodes;
 
-    // Step 3: the start is 0 km away from itself.
     dist[src] = 0;
     queueOfNodes.push(make_pair(0.0, src));
 
-    // Step 4: keep processing the closest unprocessed location.
     while (!queueOfNodes.empty())
     {
         double currentDist = queueOfNodes.top().first;
         int current = queueOfNodes.top().second;
         queueOfNodes.pop();
 
-        // An older, longer entry for this location may still be in the queue; ignore it.
         if (currentDist > dist[current])
             continue;
 
-        // Look at every road leaving this location.
         for (size_t i = 0; i < adj[current].size(); i++)
         {
             int neighbour = adj[current][i].to;
             double newDist = dist[current] + adj[current][i].km;
 
-            // Found a shorter way to reach the neighbour? Remember it.
             if (newDist < dist[neighbour])
             {
                 dist[neighbour] = newDist;
@@ -188,7 +169,6 @@ void Graph::dijkstra(int src, vector<double> &dist, vector<int> &prev) const
     }
 }
 
-// Runs Dijkstra from src, then walks BACKWARDS from dst using prev[] to build the path.
 double Graph::shortestPath(int src, int dst, vector<int> &path) const
 {
     path.clear();
@@ -200,15 +180,12 @@ double Graph::shortestPath(int src, int dst, vector<int> &path) const
     vector<int> prev;
     dijkstra(src, dist, prev);
 
-    // Still "infinite" means there is no road connection at all.
     if (dist[dst] == numeric_limits<double>::infinity())
         return -1;
 
-    // Walk from the destination back to the start (the start has prev = -1).
     for (int v = dst; v != -1; v = prev[v])
         path.push_back(v);
 
-    // We collected it backwards, so flip it.
     reverse(path.begin(), path.end());
 
     return dist[dst];
